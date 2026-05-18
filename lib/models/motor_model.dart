@@ -22,6 +22,7 @@ class MotorModel {
   });
 
   MotorModel copyWith({
+    String? userId, // ◄── TAMBAHKAN BARIS INI
     String? name,
     String? brand,
     int? currentKm,
@@ -30,7 +31,7 @@ class MotorModel {
   }) {
     return MotorModel(
       id: id,
-      userId: userId,
+      userId: userId ?? this.userId, // ◄── UBAH MENJADI SEPERTI INI
       name: name ?? this.name,
       brand: brand ?? this.brand,
       currentKm: currentKm ?? this.currentKm,
