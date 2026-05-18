@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../shared/widgets/moto_logo.dart';
 
 class AddMotorHeroCard extends StatelessWidget {
   final double contentWidth;
@@ -18,16 +17,30 @@ class AddMotorHeroCard extends StatelessWidget {
         horizontal: AppConstants.spaceMD,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFCCEEF7),
+        color: const Color(0xFFCCEEF7), // Teal muda sesuai Figma
         borderRadius: BorderRadius.circular(AppConstants.radiusLG),
       ),
       child: Column(
         children: [
-          const MotoLogo(
-            size: 80,
-            iconSize: 44,
-            isCircle: false,
-            bgOpacity: 1.0,
+          // Lingkaran aksen untuk membungkus ikon motor besar di bagian atas
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.15),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.motorcycle,
+              color: AppColors.primary,
+              size: 44,
+            ),
           ),
           const SizedBox(height: AppConstants.spaceMD),
           Text(
@@ -35,6 +48,7 @@ class AddMotorHeroCard extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
+              fontWeight: FontWeight.w600,
               color: AppColors.primary.withOpacity(0.85),
               height: 1.5,
             ),

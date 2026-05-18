@@ -29,42 +29,19 @@ class AddMotorFields extends StatelessWidget {
       children: [
         const _FormLabel(text: 'Nama Motor'),
         const SizedBox(height: AppConstants.spaceXS),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              margin: const EdgeInsets.only(top: 2),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-              ),
-              child: const Icon(
-                Icons.motorcycle_rounded,
-                color: AppColors.primary,
-                size: 26,
-              ),
-            ),
-            const SizedBox(width: AppConstants.spaceSM),
-            Expanded(
-              child: TextFormField(
-                controller: nameController,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textPrimary,
-                ),
-                decoration: _inputDecoration(hint: 'contoh: Honda BeAT 2022'),
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? 'Nama motor tidak boleh kosong'
-                    : v.trim().length < 3
-                    ? 'Minimal 3 karakter'
-                    : null,
-              ),
-            ),
-          ],
+
+        // TextFormField Nama Motor sekarang bersih dan melebar penuh (100% lebar konten)
+        TextFormField(
+          controller: nameController,
+          textCapitalization: TextCapitalization.words,
+          textInputAction: TextInputAction.next,
+          style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+          decoration: _inputDecoration(hint: 'contoh: Astrea Grand 1997'),
+          validator: (v) => v == null || v.trim().isEmpty
+              ? 'Nama motor tidak boleh kosong'
+              : v.trim().length < 3
+              ? 'Minimal 3 karakter'
+              : null,
         ),
         const SizedBox(height: AppConstants.spaceMD),
 
@@ -437,9 +414,7 @@ class _ExpandableCustomComponentInputState
                     ),
                     onChanged: (_) => _dispatchChanges(),
                   ),
-                  const SizedBox(
-                    height: AppConstants.spaceMD,
-                  ), // ◄── SEKARANG SUDAH FIX AppConstants
+                  const SizedBox(height: AppConstants.spaceMD),
                   TextFormField(
                     controller: _kmCtrl,
                     keyboardType: TextInputType.number,
