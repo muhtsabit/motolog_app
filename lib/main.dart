@@ -9,7 +9,7 @@ import 'features/auth/login_screen.dart';
 import 'features/auth/register_screen.dart';
 import 'features/auth/forgot_password.dart';
 // import 'features/motor/add_motor_screen.dart';
-// import 'features/dashboard/dashboard_screen.dart';
+import 'features/dashboard/dashboard_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,7 +35,7 @@ class MotoLogApp extends StatelessWidget {
         AppRoutes.register: (_) => const RegisterScreen(),
         AppRoutes.forgotPassword: (_) => const ForgotPasswordScreen(),
         // AppRoutes.addMotor:    (_) => const AddMotorScreen(),
-        // AppRoutes.dashboard:   (_) => const DashboardScreen(),
+        AppRoutes.dashboard: (_) => const DashboardScreen(),
       },
     );
   }
