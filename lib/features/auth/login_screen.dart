@@ -8,6 +8,8 @@ import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/auth_text_field.dart';
 import '../../shared/widgets/or_divider.dart';
 import 'widgets/auth_header.dart';
+import '../../core/services/auth_services.dart';
+import '../../core/utils/auth_redirect.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -47,7 +49,8 @@ class _LoginScreenState extends State<LoginScreen> {
     await Future.delayed(const Duration(seconds: 1)); // TODO: auth service
     if (!mounted) return;
     setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+    final user = AuthService.instance.currentUser;
+    await AuthRedirect.navigate(context, userId: user?.id ?? 'guest');
   }
 
   @override

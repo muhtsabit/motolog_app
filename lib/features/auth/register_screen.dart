@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/constants/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/auth_text_field.dart';
 import '../../shared/widgets/or_divider.dart';
 import 'widgets/auth_header.dart';
+import '../../core/services/auth_services.dart';
+import '../../core/utils/auth_redirect.dart';
 
 // Reuse sub-widgets dari login_screen — idealnya dipindah ke
 // lib/features/auth/widgets/auth_actions.dart
@@ -54,7 +55,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     await Future.delayed(const Duration(seconds: 1)); // TODO: auth service
     if (!mounted) return;
     setState(() => _isLoading = false);
-    Navigator.pushReplacementNamed(context, AppRoutes.addMotor);
+    final user = AuthService.instance.currentUser;
+    await AuthRedirect.navigate(context, userId: user?.id ?? 'guest');
   }
 
   @override
