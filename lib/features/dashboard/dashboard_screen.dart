@@ -35,14 +35,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Generate data komponen secara dinamis berdasarkan KM motor aktif saat ini
-  List<ComponentModel> _generateDynamicComponents(int currentKm) {
+  // Generate data komponen secara dinamis berdasarkan KM motor saat ini DAN riwayat awal dari onboarding
+  List<ComponentModel> _generateDynamicComponents(
+    int currentKm,
+    Map<String, int> lastServices,
+  ) {
     return [
       ComponentModel(
         name: 'Oli Mesin',
         icon: Icons.opacity_rounded,
         iconColor: const Color(0xFFFF6B2C),
-        lastServiceKm: 0, // Nanti dihitung dari riwayat servis asli backend
+        // Ambil data dari onboarding, jika tidak diinput (null), otomatis default dihitung dari 0 KM
+        lastServiceKm: lastServices['Oli Mesin'] ?? 0,
         intervalKm: 2000,
         currentKm: currentKm,
       ),
@@ -50,7 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         name: 'Busi',
         icon: Icons.electric_bolt_rounded,
         iconColor: const Color(0xFF3B82F6),
-        lastServiceKm: 0,
+        lastServiceKm: lastServices['Busi'] ?? 0,
         intervalKm: 10000,
         currentKm: currentKm,
       ),
@@ -58,7 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         name: 'Kampas Rem',
         icon: Icons.album_rounded,
         iconColor: const Color(0xFF12B76A),
-        lastServiceKm: 0,
+        lastServiceKm: lastServices['Kampas Rem'] ?? 0,
         intervalKm: 8000,
         currentKm: currentKm,
       ),
@@ -66,7 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         name: 'Filter Udara',
         icon: Icons.air_rounded,
         iconColor: const Color(0xFFFF6B2C),
-        lastServiceKm: 0,
+        lastServiceKm: lastServices['Filter Udara'] ?? 0,
         intervalKm: 6000,
         currentKm: currentKm,
       ),
@@ -91,7 +95,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final currentKm = activeMotor?.currentKm ?? 0;
 
         // Hitung komponen & warning banner secara real-time
-        final components = _generateDynamicComponents(currentKm);
+        // KODE BARU YANG BENAR:
+        final lastServices = activeMotor?.componentLastServices ?? {};
+        final components = _generateDynamicComponents(currentKm, lastServices);
 
         // Contoh kalkulasi alert: Ambil komponen oli (index 0)
         final oli = components.first;
