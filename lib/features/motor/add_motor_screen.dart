@@ -17,10 +17,12 @@ import 'package:flutter/services.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/services/motor_services.dart';
-import '../../core/services/auth_services.dart';
 import '../../models/motor_model.dart';
 import '../../shared/widgets/moto_logo.dart';
+
+import '../../core/services/mock_db.dart';
+import '../../core/state/app_state.dart';
+import '../../core/utils/app_navigator.dart';
 
 class AddMotorScreen extends StatefulWidget {
   /// true  → flow onboarding, setelah simpan langsung ke Dashboard
@@ -52,26 +54,38 @@ class _AddMotorScreenState extends State<AddMotorScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    final user = AuthService.instance.currentUser;
+    // Ambil user aktif dari AppState tunggal
+    final currentUser = AppState.instance.user;
+
+    if (currentUser == null) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesi habis, silakan login kembali.')),
+      );
+      AppNavigator.goToLogin(context);
+      return;
+    }
+
+    // Buat model dengan mengikat userId yang sedang login aktif
     final motor = MotorModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      userId: user?.id ?? 'guest',
+      userId: currentUser.id, // ID terikat sempurna ke user log-in
       name: _nameCtrl.text.trim(),
       brand: _selectedBrand ?? '',
       currentKm: int.tryParse(_kmCtrl.text.replaceAll('.', '').trim()) ?? 0,
       createdAt: DateTime.now(),
     );
 
-    await MotorService.instance.addMotor(motor);
+    // Simpan lewat AppState agar data masuk ke list local state & MockDB
+    await AppState.instance.addMotor(motor);
 
     if (!mounted) return;
     setState(() => _isLoading = false);
 
+    // Gunakan AppNavigator terpusat agar stack dibersihkan total (Bebas Bug Back)
     if (widget.isOnboarding) {
-      // Onboarding: replace seluruh stack ke dashboard
-      Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+      AppNavigator.goToDashboard(context);
     } else {
-      // Manual: kembali ke layar sebelumnya
       Navigator.pop(context, motor);
     }
   }
@@ -173,9 +187,12 @@ class _AddMotorScreenState extends State<AddMotorScreen> {
         color: AppColors.textSecondary,
       ),
       decoration: _inputDecoration(hint: 'Pilih merek'),
-      items: MotorService.brands
+
+      // DISINI TEMPATNYA: Mengubah MotorService.brands menjadi MockDB.brands
+      items: MockDB.brands
           .map((b) => DropdownMenuItem(value: b, child: Text(b)))
           .toList(),
+
       onChanged: (v) => setState(() => _selectedBrand = v),
       validator: (v) =>
           v == null || v.isEmpty ? 'Pilih merek motor terlebih dahulu' : null,

@@ -8,8 +8,9 @@ import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/auth_text_field.dart';
 import '../../shared/widgets/or_divider.dart';
 import 'widgets/auth_header.dart';
-import '../../core/services/auth_services.dart';
-import '../../core/utils/auth_redirect.dart';
+
+import '../../core/state/app_state.dart';
+import '../../core/utils/app_navigator.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -46,11 +47,25 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _onLogin() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 1)); // TODO: auth service
+
+    // Panggil login resmi dari AppState tunggal
+    final error = await AppState.instance.login(
+      _emailCtrl.text.trim(),
+      _passwordCtrl.text,
+    );
+
     if (!mounted) return;
     setState(() => _isLoading = false);
-    final user = AuthService.instance.currentUser;
-    await AuthRedirect.navigate(context, userId: user?.id ?? 'guest');
+
+    if (error != null) {
+      // Tampilkan error jika email/password salah
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: AppColors.danger),
+      );
+    } else {
+      // JIKA SUKSES: Biarkan AppNavigator yang memutuskan ke AddMotor atau Dashboard
+      AppNavigator.goAfterAuth(context);
+    }
   }
 
   @override
