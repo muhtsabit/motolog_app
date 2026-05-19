@@ -14,6 +14,7 @@
 import 'package:flutter/foundation.dart';
 import '../services/mock_db.dart'; // Pastikan path ini benar mengarah ke mock_db.dart yang diisi data
 import '../../models/motor_model.dart';
+import '../../models/service_model.dart';
 
 // ── Simple user model ─────────────────────────────────────────────────────────
 class AppUser {
@@ -120,6 +121,50 @@ class AppState extends ChangeNotifier {
 
     notifyListeners();
     return null; // Sukses
+  }
+
+  // ── Service actions ──────────────────────────────────────
+
+  // Mengambil data riwayat servis khusus untuk motor yang sedang aktif di dashboard
+  List<ServiceModel> get activeMotorServices {
+    if (activeMotor == null) return [];
+    final list = MockDB.serviceHistories
+        .where((s) => s.motorId == activeMotor!.id)
+        .toList();
+    // Urutkan berdasarkan tanggal terbaru di atas
+    list.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
+    return list;
+  }
+
+  Future<void> addService(ServiceModel service) async {
+    await _delay();
+    MockDB.serviceHistories.add(service);
+
+    // LOGIKA PENTING: Jika komponen diservis, otomatis update kilometer komponen terkait di objek motor
+    if (activeMotor != null) {
+      final updatedMap = Map<String, int>.from(
+        activeMotor!.componentLastServices,
+      );
+      updatedMap[service.componentName] = service.serviceKm;
+
+      // Update data motor dengan koordinat KM komponen yang di-reset terbaru
+      final updatedMotor = activeMotor!.copyWith(
+        componentLastServices: updatedMap,
+      );
+      final idx = _motors.indexWhere((m) => m.id == activeMotor!.id);
+      if (idx != -1) _motors[idx] = updatedMotor;
+
+      final dbIdx = MockDB.motors.indexWhere((m) => m.id == activeMotor!.id);
+      if (dbIdx != -1) MockDB.motors[dbIdx] = updatedMotor;
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> deleteService(String serviceId) async {
+    await _delay(ms: 300);
+    MockDB.serviceHistories.removeWhere((s) => s.id == serviceId);
+    notifyListeners();
   }
 
   Future<void> updateMotorKm(String motorId, int newKm) async {

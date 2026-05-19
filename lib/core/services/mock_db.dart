@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import '../../models/motor_model.dart';
+import '../../models/service_model.dart';
 
 abstract class MockDB {
   // ── Users ─────────────────────────────────────────────
@@ -31,6 +32,8 @@ abstract class MockDB {
 
   // ── Motors ────────────────────────────────────────────
   static final List<MotorModel> motors = [];
+
+  static final List<ServiceModel> serviceHistories = [];
 
   // ── Merek motor populer Indonesia ─────────────────────
   static const List<String> brands = [
