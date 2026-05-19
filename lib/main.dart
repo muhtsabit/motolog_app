@@ -1,4 +1,8 @@
+// lib/main.dart
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/date_symbol_data_local.dart'; // ◄── 1. WAJIB TAMBAH IMPORT INI
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_routes.dart';
 
@@ -10,9 +14,16 @@ import 'features/auth/register_screen.dart';
 import 'features/auth/forgot_password.dart';
 import 'features/motor/add_motor_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'features/service/service_history_screen.dart';
+import 'features/service/add_service_screen.dart';
 
-void main() {
+void main() async {
+  // ◄── 2. UBAH MENJADI ASYNC
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ◄── 3. WAJIB INITIALIZE BAHASA INDONESIA SEBELUM RUNAPP
+  await initializeDateFormatting('id_ID', null);
+
   runApp(const MotoLogApp());
 }
 
@@ -50,6 +61,8 @@ class MotoLogApp extends StatelessWidget {
           AppRoutes.register: (_) => const RegisterScreen(),
           AppRoutes.forgotPassword: (_) => const ForgotPasswordScreen(),
           AppRoutes.dashboard: (_) => const DashboardScreen(),
+          AppRoutes.serviceHistory: (_) => const ServiceHistoryScreen(),
+          AppRoutes.addService: (_) => const AddServiceScreen(),
         };
 
         final builder = routes[settings.name];

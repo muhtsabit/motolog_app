@@ -178,10 +178,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
 
-              // Bottom Nav
+              // KODE TERBARU YANG SUDAH TERINTEGRASI NAVIGASI:
               DashboardBottomNav(
                 selectedIndex: _selectedIndex,
-                onTap: (i) => setState(() => _selectedIndex = i),
+                onTap: (i) {
+                  setState(() => _selectedIndex = i);
+
+                  switch (i) {
+                    case 0:
+                      // Sudah berada di Beranda/Dashboard, tidak perlu navigasi lagi
+                      break;
+                    case 1:
+                      // Pindah ke halaman Riwayat Servis
+                      Navigator.pushNamed(context, AppRoutes.serviceHistory);
+                      break;
+                    case 2:
+                      // Pindah ke halaman Tambah Servis Cepat
+                      Navigator.pushNamed(context, AppRoutes.addService);
+                      break;
+                    case 3:
+                      // Jalur rute pengingat/notifikasi (jika sudah ada rutenya)
+                      Navigator.pushNamed(context, AppRoutes.reminder);
+                      break;
+                  }
+                },
               ),
             ],
           ),
