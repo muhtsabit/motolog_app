@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/date_symbol_data_local.dart'; // ◄── 1. WAJIB TAMBAH IMPORT INI
+import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_routes.dart';
 
@@ -16,9 +16,9 @@ import 'features/motor/add_motor_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/service/service_history_screen.dart';
 import 'features/service/add_service_screen.dart';
+import 'features/notification/notification_screen.dart';
 
 void main() async {
-  // ◄── 2. UBAH MENJADI ASYNC
   WidgetsFlutterBinding.ensureInitialized();
 
   // ◄── 3. WAJIB INITIALIZE BAHASA INDONESIA SEBELUM RUNAPP
@@ -63,6 +63,7 @@ class MotoLogApp extends StatelessWidget {
           AppRoutes.dashboard: (_) => const DashboardScreen(),
           AppRoutes.serviceHistory: (_) => const ServiceHistoryScreen(),
           AppRoutes.addService: (_) => const AddServiceScreen(),
+          AppRoutes.reminder: (_) => const NotificationScreen(),
         };
 
         final builder = routes[settings.name];

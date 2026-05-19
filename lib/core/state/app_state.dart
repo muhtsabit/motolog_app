@@ -15,6 +15,7 @@ import 'package:flutter/foundation.dart';
 import '../services/mock_db.dart'; // Pastikan path ini benar mengarah ke mock_db.dart yang diisi data
 import '../../models/motor_model.dart';
 import '../../models/service_model.dart';
+import '../../models/notification_model.dart';
 
 // ── Simple user model ─────────────────────────────────────────────────────────
 class AppUser {
@@ -184,6 +185,26 @@ class AppState extends ChangeNotifier {
     _motors.removeWhere((m) => m.id == motorId);
     MockDB.motors.removeWhere((m) => m.id == motorId);
     notifyListeners();
+  }
+
+  List<NotificationModel> get notifications => MockDB.notifications;
+
+  int get unreadNotificationCount =>
+      MockDB.notifications.where((n) => !n.isRead).length;
+
+  void markAllNotificationsAsRead() {
+    for (var notif in MockDB.notifications) {
+      notif.isRead = true;
+    }
+    notifyListeners();
+  }
+
+  void markNotificationAsRead(String id) {
+    final idx = MockDB.notifications.indexWhere((n) => n.id == id);
+    if (idx != -1) {
+      MockDB.notifications[idx].isRead = true;
+      notifyListeners();
+    }
   }
 
   // ── Internal helpers ───────────────────────────────────
