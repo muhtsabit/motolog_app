@@ -56,9 +56,7 @@ class DashboardAppBar extends StatelessWidget {
           ),
           _AppBarIconButton(
             icon: Icons.notifications_outlined,
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.reminder);
-            },
+            onTap: () => Navigator.pushNamed(context, AppRoutes.reminder),
           ),
           const SizedBox(width: AppConstants.spaceXS),
           _AppBarIconButton(

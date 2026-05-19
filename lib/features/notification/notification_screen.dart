@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/constants/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/state/app_state.dart';
 import '../../models/notification_model.dart';
@@ -66,23 +65,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               ),
 
               // ── Bottom Navigation Bar ─────────────────────
-              DashboardBottomNav(
-                selectedIndex: _selectedNav,
-                onTap: (i) {
-                  if (i == 0)
-                    Navigator.pushReplacementNamed(
-                      context,
-                      AppRoutes.dashboard,
-                    );
-                  if (i == 1)
-                    Navigator.pushReplacementNamed(
-                      context,
-                      AppRoutes.serviceHistory,
-                    );
-                  if (i == 2)
-                    Navigator.pushNamed(context, AppRoutes.addService);
-                },
-              ),
+              DashboardBottomNav(selectedIndex: _selectedNav),
             ],
           );
         },
@@ -91,7 +74,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 }
 
-// ── SUB-WIDGET: APP BAR ──────────────────────────────────────────────────────
 class _NotificationAppBar extends StatelessWidget {
   final double hPad;
   final bool hasUnread;
@@ -115,45 +97,77 @@ class _NotificationAppBar extends StatelessWidget {
         ),
       ),
       padding: EdgeInsets.fromLTRB(
-        AppConstants.spaceSM,
+        AppConstants.spaceXS,
         MediaQuery.paddingOf(context).top + AppConstants.spaceXS,
-        hPad,
+        16,
         AppConstants.spaceMD,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Notifikasi',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: -0.2,
+          Expanded(
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
                 ),
-              ),
-              Text(
-                'Pantau kesehatan part motor Anda',
-                style: TextStyle(fontSize: 12, color: Colors.white70),
-              ),
-            ],
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        'Pemberitahuan',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Pantau kesehatan part motor Anda',
+                        style: TextStyle(fontSize: 11, color: Colors.white70),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
+
+          const SizedBox(width: 8),
           if (hasUnread)
             TextButton.icon(
               onPressed: onReadAll,
               icon: const Icon(
                 Icons.done_all_rounded,
                 color: Colors.white,
-                size: 16,
+                size: 14,
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               label: const Text(
                 'Tandai Dibaca',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
               ),

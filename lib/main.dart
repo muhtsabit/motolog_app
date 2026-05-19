@@ -17,6 +17,7 @@ import 'features/dashboard/dashboard_screen.dart';
 import 'features/service/service_history_screen.dart';
 import 'features/service/add_service_screen.dart';
 import 'features/notification/notification_screen.dart';
+import 'features/profile/profile_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,6 +65,7 @@ class MotoLogApp extends StatelessWidget {
           AppRoutes.serviceHistory: (_) => const ServiceHistoryScreen(),
           AppRoutes.addService: (_) => const AddServiceScreen(),
           AppRoutes.reminder: (_) => const NotificationScreen(),
+          AppRoutes.profile: (_) => const ProfileScreen(),
         };
 
         final builder = routes[settings.name];
