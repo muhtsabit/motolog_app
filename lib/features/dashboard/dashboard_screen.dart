@@ -178,30 +178,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
 
-              DashboardBottomNav(
-                selectedIndex: _selectedIndex,
-                onTap: (i) {
-                  setState(() => _selectedIndex = i);
-
-                  switch (i) {
-                    case 0:
-                      // Sudah berada di Beranda/Dashboard, tidak perlu navigasi lagi
-                      break;
-                    case 1:
-                      // Pindah ke halaman Riwayat Servis
-                      Navigator.pushNamed(context, AppRoutes.serviceHistory);
-                      break;
-                    case 2:
-                      // Pindah ke halaman Tambah Servis Cepat
-                      Navigator.pushNamed(context, AppRoutes.addService);
-                      break;
-                    case 3:
-                      // Jalur rute pengingat/notifikasi (jika sudah ada rutenya)
-                      Navigator.pushNamed(context, AppRoutes.reminder);
-                      break;
-                  }
-                },
-              ),
+              DashboardBottomNav(selectedIndex: _selectedIndex),
             ],
           ),
         );
@@ -219,48 +196,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         title: const Text(
           'Update Kilometer',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: 'KM saat ini',
-            suffixText: 'km',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Batal',
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final activeMotor = AppState.instance.activeMotor;
-              final newKm = int.tryParse(ctrl.text) ?? currentKm;
-
-              if (activeMotor != null) {
-                // Perbarui KM motor di state & MockDB
-                await AppState.instance.updateMotorKm(activeMotor.id, newKm);
-              }
-              if (!mounted) return;
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+        content: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: ctrl,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'KM saat ini',
+                  suffixText: 'km',
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+                  ),
+                ),
               ),
             ),
-            child: const Text('Simpan'),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+              ),
+              child: const Text(
+                'Batal',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () async {
+                final activeMotor = AppState.instance.activeMotor;
+                final newKm = int.tryParse(ctrl.text) ?? currentKm;
+
+                if (activeMotor != null) {
+                  await AppState.instance.updateMotorKm(activeMotor.id, newKm);
+                }
+                if (!mounted) return;
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+                ),
+                elevation: 0,
+              ),
+              child: const Text('Simpan'),
+            ),
           ),
         ],
       ),
