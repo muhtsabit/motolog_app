@@ -5,11 +5,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // ◄── Diperlukan untuk kaidah context.watch
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/state/app_state.dart';
-import '../../core/services/auth_services.dart'; // ◄── Diperlukan untuk membaca data user riil
+import '../../core/services/auth_services.dart';
 import '../dashboard/widgets/dashboard_bottom_nav.dart';
+import '../motor/add_motor_screen.dart';
 
 import 'widgets/profile_app_bar.dart';
 import 'widgets/profile_counter_cards.dart';
@@ -24,7 +25,133 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final int _selectedNav = 0;
+  final int _selectedNav =
+      -1; // Profil berada di luar indeks utama 0-3 bottom nav
+
+  // ◄── LOGIKA UTAMA: Membuka Lembaran Daftar Motor dari MySQL ──►
+  void _showMotorSelectionSheet(BuildContext context, AppState appState) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled:
+          true, // Biar bottom sheet gak ketutup keyboard pas edit nama
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (builderContext) {
+        final activeMotorId = appState.activeMotor?.id;
+
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(builderContext).viewInsets.bottom,
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 16),
+                const Text(
+                  'Kelola & Pilih Motor Aktif',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const Divider(),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: appState.motors.length,
+                    itemBuilder: (ctx, index) {
+                      final motor = appState.motors[index];
+                      final isSelected = motor.id == activeMotorId;
+
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
+                        leading: Icon(
+                          Icons.directions_bike_rounded,
+                          color: isSelected
+                              ? const Color(0xFF2BBCD4)
+                              : AppColors.textDisabled,
+                        ),
+                        title: Text(
+                          motor.name,
+                          style: TextStyle(
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${motor.brand} • ${motor.currentKm} km',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        onTap: () {
+                          appState.changeActiveMotor(motor.id);
+                          Navigator.pop(builderContext);
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${motor.name} sekarang menjadi motor utama! 🏍️',
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor:
+                                  Colors.green, // Selaras dengan tema sukses
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(builderContext);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const AddMotorScreen(isOnboarding: false),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add_rounded, color: Colors.white),
+                      label: const Text(
+                        'Tambah Motor Baru',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,15 +159,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final contentWidth = screenWidth > 520 ? 480.0 : screenWidth - 32.0;
     final hPad = (screenWidth - contentWidth) / 2;
 
-    // ◄── KAIDAH PROVIDER: Daftarkan watch listener di tingkat atas build method ──►
-    final authService = context.watch<AuthService>();
+    final authService = context
+        .watch<AuthService>(); // ◄── SEKARANG DIGUNAKAN DI BAWAH
     final appState = context.watch<AppState>();
 
-    // Ambil data user dari AuthService (Bukan dari AppState MockDB lagi)
     final userName = authService.currentUser?.name ?? 'Pengguna MotoLog';
     final userEmail = authService.currentUser?.email ?? 'loading@motolog.com';
 
-    // Ambil data statistik dari AppState riil REST API
     final totalMotors = appState.motors.length;
     final totalServices = appState.serviceHistories.length;
 
@@ -48,7 +173,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // AppBar Hero Section menampilkan info user riil terotentikasi
           ProfileAppBar(userName: userName, userEmail: userEmail),
           Expanded(
             child: Padding(
@@ -56,12 +180,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Counter Cards menampilkan total motor & total servis dari MySQL
                   ProfileCounterCards(
                     totalMotors: totalMotors,
                     totalServices: totalServices,
+                    onMotorsTap: () =>
+                        _showMotorSelectionSheet(context, appState),
                   ),
-
                   const SizedBox(height: 16),
                   const Text(
                     'PENGATURAN',
@@ -73,8 +197,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-
-                  // Grouped Menu List
                   const ProfileMenuGroup(),
                   const Spacer(),
                   const ProfileLogoutButton(),
@@ -82,7 +204,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-
           DashboardBottomNav(selectedIndex: _selectedNav),
         ],
       ),

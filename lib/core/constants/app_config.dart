@@ -1,3 +1,3 @@
 class AppConfig {
-  static const String baseUrl = "[isi ip anda disini]";
+  static const String baseUrl = "[Ubah IP anda disini]";
 }

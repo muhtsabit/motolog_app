@@ -1,6 +1,7 @@
 // lib/core/state/app_state.dart
 // ─────────────────────────────────────────────────────────────────────────────
 // AppState — Single Source of Truth MotoLog (Versi Riil REST API Laravel MySQL)
+// Mendukung Pengelolaan Multi-Motor & Sinkronisasi Reaktif Secara Global
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'dart:convert';
@@ -15,10 +16,11 @@ class AppState extends ChangeNotifier {
   AppState._();
   static final AppState instance = AppState._();
 
-  // ── State Riil ──────────────────────────────────────────
+  // ── State Riil Terpusat ──────────────────────────────────
   final List<MotorModel> _motors = [];
   List<ServiceModel> _serviceHistories = [];
   bool _isLoading = false;
+  String? _selectedMotorId; // ◄── FIX: Penampung ID motor pilihan user
 
   // ── Getters ────────────────────────────────────────────
   bool get isLoading => _isLoading;
@@ -27,8 +29,26 @@ class AppState extends ChangeNotifier {
       List.unmodifiable(_serviceHistories);
   bool get hasMotor => _motors.isNotEmpty;
 
-  // Ambil motor pertama sebagai motor aktif utama di dashboard
-  MotorModel? get activeMotor => _motors.isNotEmpty ? _motors.first : null;
+  // ◄── FIX MUTLAK MULTI-MOTOR: Getter Aktif Dinamis Berdasarkan Pilihan User ──►
+  MotorModel? get activeMotor {
+    if (_motors.isEmpty) return null;
+    if (_selectedMotorId == null) return _motors.first;
+
+    return _motors.firstWhere(
+      (m) => m.id == _selectedMotorId,
+      orElse: () => _motors.first,
+    );
+  }
+
+  // ◄── FIX MUTLAK MULTI-MOTOR: Fungsi Pemindah Fokus Motor dari Profil ──►
+  void changeActiveMotor(String motorId) {
+    _selectedMotorId = motorId;
+
+    // Tarik ulang riwayat servis khusus milik motor yang baru dipilih
+    fetchServiceHistories(motorId);
+
+    notifyListeners(); // Pemicu reaktif agar Dashboard ikut berubah total seketika
+  }
 
   // ── Aksi Motor (REST API) ───────────────────────────────
 
@@ -43,7 +63,6 @@ class AppState extends ChangeNotifier {
         debugPrint("=== MOLOG DEBUG: Response Motor Raw -> ${response.body}");
         final dynamic decodedData = json.decode(response.body);
 
-        // Toleransi: Tangani jika Laravel me-return data dibungkus dalam objek 'data' atau list langsung
         List<dynamic> rawList = [];
         if (decodedData is List) {
           rawList = decodedData;
@@ -52,8 +71,8 @@ class AppState extends ChangeNotifier {
         }
 
         _motors.clear();
-        if (rawList.isNotEmpty) {
-          _motors.add(MotorModel.fromMap(rawList.first));
+        for (var item in rawList) {
+          _motors.add(MotorModel.fromMap(item));
         }
         notifyListeners();
       }
@@ -76,8 +95,11 @@ class AppState extends ChangeNotifier {
           .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200 && activeMotor != null) {
-        final updatedMotor = activeMotor!.copyWith(currentKm: newKm);
-        _motors[0] = updatedMotor;
+        // Update data motor lokal di dalam array list agar sinkron tanpa re-fetch
+        final index = _motors.indexWhere((m) => m.id == motorId);
+        if (index != -1) {
+          _motors[index] = _motors[index].copyWith(currentKm: newKm);
+        }
         notifyListeners();
       }
     } catch (e) {
@@ -95,8 +117,6 @@ class AppState extends ChangeNotifier {
     required String serviceDate,
   }) async {
     try {
-      // FIXING PAYLOAD: Kirim component_name sebagai string tunggal dan components array sebagai cadangan
-      // agar cocok dengan segala bentuk validasi request validator di Laravel Controller kamu
       final Map<String, dynamic> payload = {
         "motorcycle_id": motorcycleId,
         "motor_id": motorcycleId,
@@ -118,22 +138,20 @@ class AppState extends ChangeNotifier {
       final responseData = json.decode(response.body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Eksekusi pembaruan odometer & bunderan dashboard lokal secara reaktif seketika
-        if (activeMotor != null && activeMotor!.id == motorcycleId) {
+        // Sinkronisasi mutasi data komponen lokal secara reaktif
+        final index = _motors.indexWhere((m) => m.id == motorcycleId);
+        if (index != -1) {
           final updatedMap = Map<String, int>.from(
-            activeMotor!.componentLastServices,
+            _motors[index].componentLastServices,
           );
           updatedMap[componentName] = serviceKm;
 
-          final updatedMotor = activeMotor!.copyWith(
+          _motors[index] = _motors[index].copyWith(
             currentKm: serviceKm,
             componentLastServices: updatedMap,
           );
-
-          _motors[0] = updatedMotor;
         }
 
-        // Pancing penarikan riwayat terbaru langsung dari database backend
         await fetchServiceHistories(motorcycleId);
         return null;
       } else {
@@ -154,28 +172,80 @@ class AppState extends ChangeNotifier {
         debugPrint("=== MOLOG DEBUG: Response Servis Raw -> ${response.body}");
         final dynamic decodedData = json.decode(response.body);
 
-        // KUNCI AMAN PARSING: Izinkan pembacaan jika data berbentuk list langsung maupun dibungkus key 'data'
         List<dynamic> rawList = [];
         if (decodedData is List) {
           rawList = decodedData;
         } else if (decodedData is Map && decodedData.containsKey('data')) {
           rawList = decodedData['data'];
         } else if (decodedData is Map) {
-          // Kasus jika Laravel mereturn object map collection
           rawList = decodedData.values.toList();
         }
 
         _serviceHistories = rawList
             .map((jsonItem) => ServiceModel.fromMap(jsonItem))
             .toList();
-
         _serviceHistories.sort(
           (a, b) => b.serviceDate.compareTo(a.serviceDate),
         );
+
         notifyListeners();
       }
     } catch (e) {
       debugPrint("=== MOLOG ERROR API: Gagal memuat riwayat servis ($e) ===");
+    }
+  }
+
+  // ◄── AKSI EDIT MOTOR (PUT REQUEST TO LARAVEL) ──►
+  Future<String?> updateMotor(
+    String motorId,
+    String name,
+    String brand,
+    String userId,
+  ) async {
+    try {
+      final response = await http
+          .post(
+            // Menggunakan POST dengan _method PUT agar aman di beberapa framework
+            Uri.parse("${AppConfig.baseUrl}/api/motorcycles/$motorId"),
+            headers: {"Content-Type": "application/json"},
+            body: json.encode({"_method": "PUT", "name": name, "brand": brand}),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        // Tarik ulang data motor dari database agar list lokal langsung ter-refresh otomatis
+        await fetchActiveMotor(userId);
+        return null; // Return null artinya sukses tanpa error
+      }
+      return 'Gagal memperbarui data motor di server.';
+    } catch (e) {
+      return 'Terjadi kesalahan koneksi database.';
+    }
+  }
+
+  // ◄── AKSI HAPUS MOTOR (DELETE REQUEST TO LARAVEL) ──►
+  Future<String?> deleteMotor(String motorId, String userId) async {
+    try {
+      final response = await http
+          .delete(Uri.parse("${AppConfig.baseUrl}/api/motorcycles/$motorId"))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        // Hapus dari memori lokal
+        _motors.removeWhere((m) => m.id == motorId);
+
+        // Jika motor yang dihapus kebetulan sedang aktif, kembalikan fokus ke null agar fallback ke motor pertama yang tersisa
+        if (_selectedMotorId == motorId) {
+          _selectedMotorId = null;
+        }
+
+        // Segarkan data dari database
+        await fetchActiveMotor(userId);
+        return null;
+      }
+      return 'Gagal menghapus motor dari server.';
+    } catch (e) {
+      return 'Terjadi kesalahan koneksi database.';
     }
   }
 }

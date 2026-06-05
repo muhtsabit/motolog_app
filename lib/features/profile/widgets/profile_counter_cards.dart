@@ -1,4 +1,7 @@
 // lib/features/profile/widgets/profile_counter_cards.dart
+// ─────────────────────────────────────────────────────────────────────────────
+// ProfileCounterCards — Komponen Kartu Statistik Dinamis & Interaktif
+// ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
@@ -7,11 +10,13 @@ import '../../../core/theme/app_colors.dart';
 class ProfileCounterCards extends StatelessWidget {
   final int totalMotors;
   final int totalServices;
+  final VoidCallback onMotorsTap; // Callback interaktivitas lembaran bawah
 
   const ProfileCounterCards({
     super.key,
     required this.totalMotors,
     required this.totalServices,
+    required this.onMotorsTap,
   });
 
   @override
@@ -19,11 +24,14 @@ class ProfileCounterCards extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _ItemCard(
-            count: totalMotors,
-            label: 'Motor Terdaftar',
-            icon: Icons.directions_bike_rounded,
-            iconColor: const Color(0xFF2BBCD4),
+          child: GestureDetector(
+            onTap: onMotorsTap, // Memicu aksi klik pop-up Multi-Motor
+            child: _ItemCard(
+              count: totalMotors,
+              label: 'Motor Terdaftar',
+              icon: Icons.directions_bike_rounded,
+              iconColor: const Color(0xFF2BBCD4),
+            ),
           ),
         ),
         const SizedBox(width: 12),
