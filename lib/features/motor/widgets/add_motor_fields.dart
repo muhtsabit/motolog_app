@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/services/mock_db.dart';
 
 class AddMotorFields extends StatelessWidget {
   final TextEditingController nameController;
@@ -30,7 +29,6 @@ class AddMotorFields extends StatelessWidget {
         const _FormLabel(text: 'Nama Motor'),
         const SizedBox(height: AppConstants.spaceXS),
 
-        // TextFormField Nama Motor sekarang bersih dan melebar penuh (100% lebar konten)
         TextFormField(
           controller: nameController,
           textCapitalization: TextCapitalization.words,
@@ -56,7 +54,7 @@ class AddMotorFields extends StatelessWidget {
             color: AppColors.textSecondary,
           ),
           decoration: _inputDecoration(hint: 'Pilih merek'),
-          items: MockDB.brands
+          items: AppConstants.motorBrands
               .map((b) => DropdownMenuItem(value: b, child: Text(b)))
               .toList(),
           onChanged: onBrandChanged,
@@ -123,11 +121,14 @@ class AddMotorFields extends StatelessWidget {
         ) {
           return _ExpandableComponentInput(
             componentName: componentName,
+            kmController: kmController, // ◄── TERUSKAN KONTROLLER KE SUB-WIDGET
             onKmChanged: (val) => componentLastServices[componentName] = val,
           );
         }),
 
         _ExpandableCustomComponentInput(
+          kmController:
+              kmController, // ◄── TERUSKAN KONTROLLER KE SUB-WIDGET KUSTOM
           onDataChanged: (customName, kmValue) {
             if (customName.isNotEmpty) {
               componentLastServices[customName] = kmValue;
@@ -192,10 +193,12 @@ class _FormLabel extends StatelessWidget {
 
 class _ExpandableComponentInput extends StatefulWidget {
   final String componentName;
+  final TextEditingController kmController; // ◄── WAJIB ADA DI CONSTRUCTOR
   final ValueChanged<int> onKmChanged;
 
   const _ExpandableComponentInput({
     required this.componentName,
+    required this.kmController,
     required this.onKmChanged,
   });
 
@@ -292,6 +295,25 @@ class _ExpandableComponentInputState extends State<_ExpandableComponentInput> {
                     borderRadius: BorderRadius.circular(AppConstants.radiusSM),
                   ),
                 ),
+                // ◄── LOGIKA BARU: VALIDASI BATAS KILOMETER KOMPONEN UTAMA ──►
+                validator: (v) {
+                  if (_isExpanded && (v == null || v.isEmpty)) {
+                    return 'Kilometer komponen tidak boleh kosong';
+                  }
+
+                  final int currentMotorKm =
+                      int.tryParse(
+                        widget.kmController.text.replaceAll('.', '').trim(),
+                      ) ??
+                      0;
+                  final int componentKm =
+                      int.tryParse(v!.replaceAll('.', '').trim()) ?? 0;
+
+                  if (componentKm > currentMotorKm) {
+                    return 'Tidak boleh melebihi KM motor ($currentMotorKm km)';
+                  }
+                  return null;
+                },
                 onChanged: (v) {
                   final parsed =
                       int.tryParse(v.replaceAll('.', '').trim()) ?? 0;
@@ -306,9 +328,13 @@ class _ExpandableComponentInputState extends State<_ExpandableComponentInput> {
 }
 
 class _ExpandableCustomComponentInput extends StatefulWidget {
+  final TextEditingController kmController; // ◄── WAJIB ADA DI CONSTRUCTOR
   final Function(String, int) onDataChanged;
 
-  const _ExpandableCustomComponentInput({required this.onDataChanged});
+  const _ExpandableCustomComponentInput({
+    required this.kmController,
+    required this.onDataChanged,
+  });
 
   @override
   State<_ExpandableCustomComponentInput> createState() =>
@@ -412,6 +438,12 @@ class _ExpandableCustomComponentInputState
                         ),
                       ),
                     ),
+                    validator: (v) {
+                      if (_isExpanded && (v == null || v.trim().isEmpty)) {
+                        return 'Nama komponen tambahan wajib diisi';
+                      }
+                      return null;
+                    },
                     onChanged: (_) => _dispatchChanges(),
                   ),
                   const SizedBox(height: AppConstants.spaceMD),
@@ -441,6 +473,25 @@ class _ExpandableCustomComponentInputState
                         ),
                       ),
                     ),
+                    // ◄── LOGIKA BARU: VALIDASI BATAS KILOMETER KOMPONEN KUSTOM ──►
+                    validator: (v) {
+                      if (_isExpanded && (v == null || v.isEmpty)) {
+                        return 'Kilometer wajib diisi';
+                      }
+
+                      final int currentMotorKm =
+                          int.tryParse(
+                            widget.kmController.text.replaceAll('.', '').trim(),
+                          ) ??
+                          0;
+                      final int componentKm =
+                          int.tryParse(v!.replaceAll('.', '').trim()) ?? 0;
+
+                      if (componentKm > currentMotorKm) {
+                        return 'Tidak boleh melebihi KM motor ($currentMotorKm km)';
+                      }
+                      return null;
+                    },
                     onChanged: (_) => _dispatchChanges(),
                   ),
                 ],

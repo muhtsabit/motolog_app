@@ -23,7 +23,6 @@ class ServiceModel {
     required this.createdAt,
   });
 
-  // Getter otomatis untuk mencocokkan Icon berdasarkan nama komponen di UI
   IconData get componentIcon {
     final match = kComponentOptions.firstWhere(
       (element) => element.name.toLowerCase() == componentName.toLowerCase(),
@@ -51,29 +50,40 @@ class ServiceModel {
     );
   }
 
-  // Siap dikirim ke backend Laravel dalam bentuk JSON / Form-Data
   Map<String, dynamic> toMap() => {
     'id': id,
-    'motorId': motorId,
-    'userId': userId,
-    'componentName': componentName,
-    'serviceDate': serviceDate.toIso8601String(),
-    'serviceKm': serviceKm,
+    'motor_id': motorId,
+    'user_id': userId,
+    'component_name': componentName,
+    'service_date': serviceDate.toIso8601String(),
+    'service_km': serviceKm,
     'notes': notes,
-    'createdAt': createdAt.toIso8601String(),
+    'created_at': createdAt.toIso8601String(),
   };
 
-  // Siap memetakan response JSON dari API Laravel
-  factory ServiceModel.fromMap(Map<String, dynamic> map) => ServiceModel(
-    id: map['id'],
-    motorId: map['motorId'],
-    userId: map['userId'],
-    componentName: map['componentName'],
-    serviceDate: DateTime.parse(map['serviceDate']),
-    serviceKm: map['serviceKm'],
-    notes: map['notes'],
-    createdAt: DateTime.parse(map['createdAt']),
-  );
+  // ◄── FIX MUTLAK TUBES: Pemetaan Fleksibel membaca JSON murni MySQL Laravel ──►
+  factory ServiceModel.fromMap(Map<String, dynamic> map) {
+    return ServiceModel(
+      id: map['id'].toString(),
+      motorId: (map['motorcycle_id'] ?? map['motor_id'] ?? map['motorId'] ?? '')
+          .toString(),
+      userId: (map['user_id'] ?? map['userId'] ?? '').toString(),
+      componentName:
+          map['component_name'] ?? map['componentName'] ?? 'Servis Rutin',
+      serviceDate: map['service_date'] != null
+          ? DateTime.parse(map['service_date'])
+          : DateTime.parse(
+              map['serviceDate'] ?? DateTime.now().toIso8601String(),
+            ),
+      serviceKm: map['service_km'] ?? map['serviceKm'] ?? 0,
+      notes: map['notes'],
+      createdAt: map['created_at'] != null
+          ? DateTime.parse(map['created_at'])
+          : DateTime.parse(
+              map['createdAt'] ?? DateTime.now().toIso8601String(),
+            ),
+    );
+  }
 }
 
 class ComponentOption {

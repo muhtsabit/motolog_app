@@ -1,220 +1,181 @@
 // lib/core/state/app_state.dart
-//
-// AppState — Single source of truth untuk seluruh aplikasi.
-// Menyimpan: currentUser, motors, isLoading.
-//
-// Arsitektur ini sengaja dibuat sederhana dengan ChangeNotifier
-// supaya nanti mudah diganti Provider / Riverpod / Bloc + backend.
-//
-// Cara pakai di widget:
-//   final state = AppState.instance;
-//   state.addListener(() => setState(() {}));   // atau pakai ListenableBuilder
+// ─────────────────────────────────────────────────────────────────────────────
+// AppState — Single Source of Truth MotoLog (Versi Riil REST API Laravel MySQL)
 // ─────────────────────────────────────────────────────────────────────────────
 
-import 'package:flutter/foundation.dart';
-import '../services/mock_db.dart'; // Pastikan path ini benar mengarah ke mock_db.dart yang diisi data
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+import '../constants/app_config.dart';
 import '../../models/motor_model.dart';
 import '../../models/service_model.dart';
-import '../../models/notification_model.dart';
 
-// ── Simple user model ─────────────────────────────────────────────────────────
-class AppUser {
-  final String id;
-  final String name;
-  final String email;
-  const AppUser({required this.id, required this.name, required this.email});
-}
-
-// ── AppState ──────────────────────────────────────────────────────────────────
 class AppState extends ChangeNotifier {
   AppState._();
   static final AppState instance = AppState._();
 
-  // ── State ──────────────────────────────────────────────
-  AppUser? _user;
+  // ── State Riil ──────────────────────────────────────────
   final List<MotorModel> _motors = [];
+  List<ServiceModel> _serviceHistories = [];
+  bool _isLoading = false;
 
   // ── Getters ────────────────────────────────────────────
-  AppUser? get user => _user;
-  bool get isLoggedIn => _user != null;
+  bool get isLoading => _isLoading;
   List<MotorModel> get motors => List.unmodifiable(_motors);
+  List<ServiceModel> get serviceHistories =>
+      List.unmodifiable(_serviceHistories);
   bool get hasMotor => _motors.isNotEmpty;
 
-  // Motor aktif yang sedang ditampilkan di dashboard
+  // Ambil motor pertama sebagai motor aktif utama di dashboard
   MotorModel? get activeMotor => _motors.isNotEmpty ? _motors.first : null;
 
-  // ── Auth actions ───────────────────────────────────────
+  // ── Aksi Motor (REST API) ───────────────────────────────
 
-  Future<String?> login(String email, String password) async {
-    await _delay();
+  Future<void> fetchActiveMotor(String userId) async {
+    try {
+      _isLoading = true;
+      final response = await http
+          .get(Uri.parse("${AppConfig.baseUrl}/api/motorcycles/$userId"))
+          .timeout(const Duration(seconds: 5));
 
-    // Mencari data user di MockDB berdasarkan email lowercase
-    final record = MockDB.users[email.toLowerCase().trim()];
-    if (record == null) return 'Email tidak terdaftar.';
-    if (record['password'] != password) return 'Kata sandi salah.';
+      if (response.statusCode == 200) {
+        debugPrint("=== MOLOG DEBUG: Response Motor Raw -> ${response.body}");
+        final dynamic decodedData = json.decode(response.body);
 
-    _user = AppUser(
-      id: record['id']!,
-      name: record['name']!,
-      email: email.toLowerCase().trim(),
-    );
+        // Toleransi: Tangani jika Laravel me-return data dibungkus dalam objek 'data' atau list langsung
+        List<dynamic> rawList = [];
+        if (decodedData is List) {
+          rawList = decodedData;
+        } else if (decodedData is Map && decodedData.containsKey('data')) {
+          rawList = decodedData['data'];
+        }
 
-    // Muat motor milik user ini
-    _loadMotors(_user!.id);
-    notifyListeners();
-    return null; // null = sukses
-  }
-
-  Future<String?> register(String name, String email, String password) async {
-    await _delay();
-    final key = email.toLowerCase().trim();
-    if (MockDB.users.containsKey(key)) return 'Email sudah terdaftar.';
-
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
-    MockDB.users[key] = {'id': id, 'name': name, 'password': password};
-
-    _user = AppUser(id: id, name: name, email: key);
-    _motors.clear(); // user baru, belum ada motor
-    notifyListeners();
-    return null;
-  }
-
-  Future<String?> loginWithGoogle() async {
-    await _delay(ms: 1000);
-    const id = 'google_001';
-    MockDB.users['google@gmail.com'] ??= {
-      'id': id,
-      'name': 'Pengguna Google',
-      'password': '',
-    };
-    _user = const AppUser(
-      id: id,
-      name: 'Pengguna Google',
-      email: 'google@gmail.com',
-    );
-    _loadMotors(id);
-    notifyListeners();
-    return null;
-  }
-
-  void logout() {
-    _user = null;
-    _motors.clear();
-    notifyListeners();
-  }
-
-  // ── Motor actions ──────────────────────────────────────
-
-  Future<String?> addMotor(MotorModel motor) async {
-    await _delay();
-
-    // Pastikan ada user yang aktif saat input motor dilakukan
-    if (_user == null) {
-      return 'Sesi berakhir. Silakan login kembali.';
-    }
-
-    // PAKSA: Ikat data motor ke userId milik user yang sedang login aktif saat ini
-    final motorWithUser = motor.copyWith(userId: _user!.id);
-
-    // Simpan data motor yang sudah terikat ke memory DB
-    MockDB.motors.add(motorWithUser);
-    _motors.add(motorWithUser);
-
-    notifyListeners();
-    return null; // Sukses
-  }
-
-  // ── Service actions ──────────────────────────────────────
-
-  // Mengambil data riwayat servis khusus untuk motor yang sedang aktif di dashboard
-  List<ServiceModel> get activeMotorServices {
-    if (activeMotor == null) return [];
-    final list = MockDB.serviceHistories
-        .where((s) => s.motorId == activeMotor!.id)
-        .toList();
-    // Urutkan berdasarkan tanggal terbaru di atas
-    list.sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
-    return list;
-  }
-
-  Future<void> addService(ServiceModel service) async {
-    await _delay();
-    MockDB.serviceHistories.add(service);
-
-    // LOGIKA PENTING: Jika komponen diservis, otomatis update kilometer komponen terkait di objek motor
-    if (activeMotor != null) {
-      final updatedMap = Map<String, int>.from(
-        activeMotor!.componentLastServices,
-      );
-      updatedMap[service.componentName] = service.serviceKm;
-
-      // Update data motor dengan koordinat KM komponen yang di-reset terbaru
-      final updatedMotor = activeMotor!.copyWith(
-        componentLastServices: updatedMap,
-      );
-      final idx = _motors.indexWhere((m) => m.id == activeMotor!.id);
-      if (idx != -1) _motors[idx] = updatedMotor;
-
-      final dbIdx = MockDB.motors.indexWhere((m) => m.id == activeMotor!.id);
-      if (dbIdx != -1) MockDB.motors[dbIdx] = updatedMotor;
-    }
-
-    notifyListeners();
-  }
-
-  Future<void> deleteService(String serviceId) async {
-    await _delay(ms: 300);
-    MockDB.serviceHistories.removeWhere((s) => s.id == serviceId);
-    notifyListeners();
-  }
-
-  Future<void> updateMotorKm(String motorId, int newKm) async {
-    await _delay(ms: 400);
-    final idx = _motors.indexWhere((m) => m.id == motorId);
-    if (idx == -1) return;
-    final updated = _motors[idx].copyWith(currentKm: newKm);
-    _motors[idx] = updated;
-
-    final dbIdx = MockDB.motors.indexWhere((m) => m.id == motorId);
-    if (dbIdx != -1) MockDB.motors[dbIdx] = updated;
-    notifyListeners();
-  }
-
-  Future<void> deleteMotor(String motorId) async {
-    await _delay();
-    _motors.removeWhere((m) => m.id == motorId);
-    MockDB.motors.removeWhere((m) => m.id == motorId);
-    notifyListeners();
-  }
-
-  List<NotificationModel> get notifications => MockDB.notifications;
-
-  int get unreadNotificationCount =>
-      MockDB.notifications.where((n) => !n.isRead).length;
-
-  void markAllNotificationsAsRead() {
-    for (var notif in MockDB.notifications) {
-      notif.isRead = true;
-    }
-    notifyListeners();
-  }
-
-  void markNotificationAsRead(String id) {
-    final idx = MockDB.notifications.indexWhere((n) => n.id == id);
-    if (idx != -1) {
-      MockDB.notifications[idx].isRead = true;
+        _motors.clear();
+        if (rawList.isNotEmpty) {
+          _motors.add(MotorModel.fromMap(rawList.first));
+        }
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("=== MOLOG ERROR API: Gagal memuat data motor ($e) ===");
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
 
-  // ── Internal helpers ───────────────────────────────────
+  Future<void> updateMotorKm(String motorId, int newKm) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse("${AppConfig.baseUrl}/api/motorcycles/$motorId/km"),
+            headers: {"Content-Type": "application/json"},
+            body: json.encode({"_method": "PATCH", "current_km": newKm}),
+          )
+          .timeout(const Duration(seconds: 5));
 
-  void _loadMotors(String userId) {
-    _motors
-      ..clear()
-      ..addAll(MockDB.motors.where((m) => m.userId == userId));
+      if (response.statusCode == 200 && activeMotor != null) {
+        final updatedMotor = activeMotor!.copyWith(currentKm: newKm);
+        _motors[0] = updatedMotor;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("=== MOLOG ERROR API: Gagal update kilometer ($e) ===");
+    }
   }
 
-  Future<void> _delay({int ms = 700}) =>
-      Future.delayed(Duration(milliseconds: ms));
+  // ── Aksi Servis (REST API) ──────────────────────────────
+
+  Future<String?> addService({
+    required String motorcycleId,
+    required int serviceKm,
+    required String componentName,
+    required String notes,
+    required String serviceDate,
+  }) async {
+    try {
+      // FIXING PAYLOAD: Kirim component_name sebagai string tunggal dan components array sebagai cadangan
+      // agar cocok dengan segala bentuk validasi request validator di Laravel Controller kamu
+      final Map<String, dynamic> payload = {
+        "motorcycle_id": motorcycleId,
+        "motor_id": motorcycleId,
+        "service_km": serviceKm,
+        "notes": notes,
+        "service_date": serviceDate,
+        "component_name": componentName,
+        "components": [componentName],
+      };
+
+      final response = await http
+          .post(
+            Uri.parse("${AppConfig.baseUrl}/api/services"),
+            headers: {"Content-Type": "application/json"},
+            body: json.encode(payload),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      final responseData = json.decode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Eksekusi pembaruan odometer & bunderan dashboard lokal secara reaktif seketika
+        if (activeMotor != null && activeMotor!.id == motorcycleId) {
+          final updatedMap = Map<String, int>.from(
+            activeMotor!.componentLastServices,
+          );
+          updatedMap[componentName] = serviceKm;
+
+          final updatedMotor = activeMotor!.copyWith(
+            currentKm: serviceKm,
+            componentLastServices: updatedMap,
+          );
+
+          _motors[0] = updatedMotor;
+        }
+
+        // Pancing penarikan riwayat terbaru langsung dari database backend
+        await fetchServiceHistories(motorcycleId);
+        return null;
+      } else {
+        return responseData['message'] ?? 'Gagal menyimpan catatan servis.';
+      }
+    } catch (e) {
+      return 'Terjadi kesalahan koneksi ke server database laptop.';
+    }
+  }
+
+  Future<void> fetchServiceHistories(String motorcycleId) async {
+    try {
+      final response = await http
+          .get(Uri.parse("${AppConfig.baseUrl}/api/services/$motorcycleId"))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        debugPrint("=== MOLOG DEBUG: Response Servis Raw -> ${response.body}");
+        final dynamic decodedData = json.decode(response.body);
+
+        // KUNCI AMAN PARSING: Izinkan pembacaan jika data berbentuk list langsung maupun dibungkus key 'data'
+        List<dynamic> rawList = [];
+        if (decodedData is List) {
+          rawList = decodedData;
+        } else if (decodedData is Map && decodedData.containsKey('data')) {
+          rawList = decodedData['data'];
+        } else if (decodedData is Map) {
+          // Kasus jika Laravel mereturn object map collection
+          rawList = decodedData.values.toList();
+        }
+
+        _serviceHistories = rawList
+            .map((jsonItem) => ServiceModel.fromMap(jsonItem))
+            .toList();
+
+        _serviceHistories.sort(
+          (a, b) => b.serviceDate.compareTo(a.serviceDate),
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint("=== MOLOG ERROR API: Gagal memuat riwayat servis ($e) ===");
+    }
+  }
 }

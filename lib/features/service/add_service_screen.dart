@@ -1,11 +1,16 @@
 // lib/features/service/add_service_screen.dart
+// ─────────────────────────────────────────────────────────────────────────────
+// Add Service Screen — MotoLog
+// Penyelarasan Form Input Dengan REST API Laravel MySQL Berdasarkan Kaidah Provider
+// ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart'; // ◄── WAJIB UNTUK AKSES REAKTIF PROVIDER
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/state/app_state.dart';
-import '../../models/service_model.dart';
+
 import 'widgets/add_service_app_bar.dart';
 import 'widgets/add_service_fields.dart';
 import 'widgets/add_service_save_bar.dart';
@@ -31,29 +36,32 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
   @override
   void initState() {
     super.initState();
-    // Default tanggal hari ini
     _dateCtrl.text = DateFormat('dd/MM/yyyy').format(_selectedDate);
 
-    // Auto-fill KM berdasarkan odometer motor aktif saat ini agar user tidak repot ngetik dari nol
-    final activeMotor = AppState.instance.activeMotor;
-    if (activeMotor != null) {
-      _kmCtrl.text = activeMotor.currentKm.toString().replaceAllMapped(
-        RegExp(r'(\d)(?=(\d{3})+$)'),
-        (m) => '${m[1]}.',
-      );
-    }
+    // ◄── KAIDAH PROVIDER: Ambil data awal odometer motor aktif secara aman via BuildContext ──►
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final activeMotor = context.read<AppState>().activeMotor;
+      if (activeMotor != null) {
+        setState(() {
+          _kmCtrl.text = activeMotor.currentKm.toString().replaceAllMapped(
+            RegExp(r'(\d)(?=(\d{3})+$)'),
+            (m) => '${m[1]}.',
+          );
+        });
+      }
+    });
   }
 
   Future<void> _onSave() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final state = AppState.instance;
+    // Ambil instance AppState menggunakan context read
+    final appState = context.read<AppState>();
 
-    // 1. Amankan pengecekan data jika null agar tidak silent-freeze atau crash
-    if (state.activeMotor == null) {
+    if (appState.activeMotor == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Gagal: Belum ada motor yang aktif pilih.'),
+          content: Text('Gagal: Belum ada motor yang aktif terpilih.'),
         ),
       );
       return;
@@ -70,47 +78,39 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
 
     setState(() => _isLoading = true);
 
-    try {
-      // 2. Gunakan fallback ID jika session user kosong saat testing offline
-      final currentUserId = state.user?.id ?? 'user_default_01';
-      final currentMotorId = state.activeMotor!.id;
+    // ◄── SINKRONISASI API: Pindahkan logika pembuatan model langsung ke parameter Provider ──►
+    final int cleanKm =
+        int.tryParse(_kmCtrl.text.replaceAll('.', '').trim()) ?? 0;
+    final String currentMotorId = appState.activeMotor!.id;
 
-      // Buat objek model service baru
-      final newService = ServiceModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        motorId: currentMotorId,
-        userId: currentUserId,
-        componentName: _selectedComponent!,
-        serviceDate: _selectedDate,
-        serviceKm: int.tryParse(_kmCtrl.text.replaceAll('.', '').trim()) ?? 0,
-        notes: _notesCtrl.text.trim(),
-        createdAt: DateTime.now(),
-      );
+    // Panggil fungsi addService terpusat yang sudah terkoneksi ke server Laravel MySQL laptop
+    final errorResult = await appState.addService(
+      motorcycleId: currentMotorId,
+      serviceKm: cleanKm,
+      componentName: _selectedComponent!,
+      notes: _notesCtrl.text.trim(),
+      serviceDate: DateFormat(
+        'yyyy-MM-dd',
+      ).format(_selectedDate), // Format baku MySQL
+    );
 
-      // SIMPAN: Ini akan otomatis update Timeline Riwayat DAN Reset Progress Bar di Dashboard!
-      await state.addService(newService);
+    if (!mounted) return;
+    setState(() => _isLoading = false);
 
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-
+    if (errorResult == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Catatan servis berhasil disimpan!'),
+          content: Text(
+            'Catatan servis berhasil disimpan ke MySQL laptop! 🛠️',
+          ),
           backgroundColor: Colors.green,
         ),
       );
-
-      // Kembali ke halaman sebelumnya (Riwayat) dengan aman
-      Navigator.pop(context);
-    } catch (e) {
-      // Jika ada error internal, matikan loading dan tunjukkan biang keroknya
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      // Kembali ke halaman sebelumnya (Halaman Riwayat otomatis ke-refresh)
+      Navigator.pop(context, true);
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error input data: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(errorResult), backgroundColor: Colors.red),
       );
     }
   }
@@ -153,11 +153,8 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    // Hero Card "Tambah Cepat" sesuai screenshot
                     const _AddServiceHero(),
                     const SizedBox(height: AppConstants.spaceLG),
-
-                    // Input Fields
                     AddServiceFields(
                       selectedComponent: _selectedComponent,
                       kmController: _kmCtrl,

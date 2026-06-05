@@ -1,19 +1,13 @@
-// lib/features/auth/forgot_password_screen.dart
-//
-// Forgot Password Screen — MotoLog
-// Layout konsisten dengan Login/Register:
-// gradient header + white body + form email + CTA button
-// Flow: masukkan email → sukses → cek email screen
-// ─────────────────────────────────────────────────────────────────────────────
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/auth_services.dart';
 import '../../shared/widgets/auth_text_field.dart';
 import 'widgets/auth_header.dart';
+import 'widgets/auth_actions.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -46,14 +40,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _onSend() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
     setState(() => _isLoading = true);
-
-    final result = await AuthService.instance.forgotPassword(
+    final result = await context.read<AuthService>().forgotPassword(
       email: _emailCtrl.text.trim(),
     );
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
     setState(() => _isLoading = false);
 
     if (result.isSuccess) {
@@ -82,7 +79,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // ── Header — sama persis dengan login/register ───
           AuthHeader(
             title: 'Lupa Kata Sandi',
             subtitle: _emailSent
@@ -90,8 +86,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 : 'Masukkan email akun Anda',
             contentWidth: contentWidth,
           ),
-
-          // ── Body ─────────────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
@@ -124,9 +118,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// _ForgotPasswordForm — input email + tombol kirim
-// ─────────────────────────────────────────────────────────────────────────────
+//Form ForgotPass
 class _ForgotPasswordForm extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController emailCtrl;
@@ -149,7 +141,6 @@ class _ForgotPasswordForm extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Instruksi
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(AppConstants.spaceMD),
@@ -180,10 +171,7 @@ class _ForgotPasswordForm extends StatelessWidget {
               ],
             ),
           ),
-
           const SizedBox(height: AppConstants.spaceLG),
-
-          // Email field
           AuthTextField(
             label: 'Email',
             hint: 'contoh@email.com',
@@ -199,68 +187,19 @@ class _ForgotPasswordForm extends StatelessWidget {
               return null;
             },
           ),
-
           const SizedBox(height: AppConstants.spaceLG),
 
-          // Tombol Kirim
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton(
-              onPressed: isLoading ? null : onSend,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-                ),
-              ),
-              child: isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      'Kirim Link Reset',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-            ),
+          AuthPrimaryButton(
+            label: 'Kirim Link Reset',
+            isLoading: isLoading,
+            onPressed: onSend,
           ),
-
           const SizedBox(height: AppConstants.spaceMD),
 
-          // Kembali ke Login
-          Center(
-            child: TextButton.icon(
-              onPressed: onBack,
-              icon: const Icon(
-                Icons.arrow_back_rounded,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
-              label: const Text(
-                'Kembali ke Login',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppConstants.spaceSM,
-                  vertical: AppConstants.spaceXS,
-                ),
-              ),
-            ),
+          AuthBottomLink(
+            question: '',
+            actionLabel: 'Kembali ke Login',
+            onTap: onBack,
           ),
         ],
       ),
@@ -268,9 +207,6 @@ class _ForgotPasswordForm extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// _EmailSentView — tampilan sukses setelah email dikirim
-// ─────────────────────────────────────────────────────────────────────────────
 class _EmailSentView extends StatelessWidget {
   final String email;
   final VoidCallback onBackToLogin;
@@ -287,8 +223,6 @@ class _EmailSentView extends StatelessWidget {
     return Column(
       children: [
         const SizedBox(height: AppConstants.spaceXL),
-
-        // Icon sukses
         Container(
           width: 80,
           height: 80,
@@ -302,9 +236,7 @@ class _EmailSentView extends StatelessWidget {
             size: 40,
           ),
         ),
-
         const SizedBox(height: AppConstants.spaceLG),
-
         const Text(
           'Email Terkirim!',
           style: TextStyle(
@@ -313,9 +245,7 @@ class _EmailSentView extends StatelessWidget {
             color: AppColors.textPrimary,
           ),
         ),
-
         const SizedBox(height: AppConstants.spaceSM),
-
         Text(
           'Link reset kata sandi telah dikirim ke',
           textAlign: TextAlign.center,
@@ -325,9 +255,7 @@ class _EmailSentView extends StatelessWidget {
             height: 1.5,
           ),
         ),
-
         const SizedBox(height: 4),
-
         Text(
           email,
           textAlign: TextAlign.center,
@@ -337,11 +265,9 @@ class _EmailSentView extends StatelessWidget {
             color: AppColors.primary,
           ),
         ),
-
         const SizedBox(height: AppConstants.spaceXS),
-
         Text(
-          'Periksa folder spam jika tidak muncul\ndi kotak masuk.',
+          'Periksa folder spam jika tidak muncul di kotak masuk.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 13,
@@ -349,33 +275,14 @@ class _EmailSentView extends StatelessWidget {
             height: 1.5,
           ),
         ),
-
         const SizedBox(height: AppConstants.spaceXL),
 
-        // Tombol Kembali ke Login
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: onBackToLogin,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-              ),
-            ),
-            child: const Text(
-              'Kembali ke Login',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-            ),
-          ),
+        AuthPrimaryButton(
+          label: 'Kembali ke Login',
+          isLoading: false,
+          onPressed: onBackToLogin,
         ),
-
         const SizedBox(height: AppConstants.spaceMD),
-
-        // Kirim ulang
         Center(
           child: RichText(
             text: TextSpan(

@@ -1,8 +1,13 @@
 // lib/features/service/service_history_screen.dart
+// ─────────────────────────────────────────────────────────────────────────────
+// Service History Screen — MotoLog
+// Integrasi Timeline Riwayat Servis Riil Berbasis Arsitektur Provider & MySQL
+// ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart'; // ◄── Diperlukan untuk kaidah context.watch & read
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/theme/app_colors.dart';
@@ -28,8 +33,18 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
         statusBarIconBrightness: Brightness.light,
       ),
     );
+
+    // ◄── KAIDAH PROVIDER: Ambil data riwayat riil dari MySQL begitu halaman dimuat ──►
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final activeMotor = context.read<AppState>().activeMotor;
+      if (activeMotor != null) {
+        context.read<AppState>().fetchServiceHistories(activeMotor.id);
+      }
+    });
   }
 
+  // Catatan: Fungsi hapus dinonaktifkan opsional karena kita fokus pada tracking maju,
+  // namun dialog tetap dipertahankan murni lokal agar tidak crash
   void _onDeleteService(String id) {
     showDialog(
       context: context,
@@ -54,18 +69,12 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
             ),
           ),
           ElevatedButton(
-            onPressed: () async {
-              // Hapus data langsung terpusat melalui AppState
-              await AppState.instance.deleteService(id);
-              if (!mounted) return;
+            onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Riwayat berhasil dihapus'),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+                const SnackBar(
+                  content: Text(
+                    'Fitur hapus dinonaktifkan demi integritas data KM.',
                   ),
                 ),
               );
@@ -73,9 +82,6 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.danger,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-              ),
             ),
             child: const Text('Hapus'),
           ),
@@ -98,55 +104,49 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
     final contentWidth = screenWidth > 520 ? 480.0 : screenWidth - 32.0;
     final hPad = (screenWidth - contentWidth) / 2;
 
+    // ◄── KAIDAH PROVIDER: Ambil data secara reaktif menggunakan watch ──►
+    final appState = context.watch<AppState>();
+    final services = appState.serviceHistories;
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: ListenableBuilder(
-        listenable: AppState.instance,
-        builder: (context, _) {
-          // Mengambil riwayat servis real-time berdasarkan motor aktif saat ini
-          final services = AppState.instance.activeMotorServices;
-
-          return Column(
-            children: [
-              _ServiceHistoryAppBar(hPad: hPad, contentWidth: contentWidth),
-              Expanded(
-                child: services.isEmpty
-                    ? _EmptyServiceState(
-                        onAddService: () =>
-                            Navigator.pushNamed(context, AppRoutes.addService),
-                      )
-                    : _ServiceTimeline(
-                        services: services,
-                        hPad: hPad,
-                        contentWidth: contentWidth,
-                        onEdit: _onEditService,
-                        onDelete: _onDeleteService,
-                      ),
-              ),
-              _HistoryBottomNav(
-                selectedIndex: _selectedNav,
-                onTap: (i) {
-                  if (i == 0)
-                    Navigator.pushReplacementNamed(
-                      context,
-                      AppRoutes.dashboard,
-                    );
-                  if (i == 2)
-                    Navigator.pushNamed(context, AppRoutes.addService);
-                  if (i == 3) Navigator.pushNamed(context, AppRoutes.reminder);
-                },
-              ),
-            ],
-          );
-        },
+      body: Column(
+        children: [
+          _ServiceHistoryAppBar(hPad: hPad, contentWidth: contentWidth),
+          Expanded(
+            child: appState.isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  )
+                : services.isEmpty
+                ? _EmptyServiceState(
+                    onAddService: () =>
+                        Navigator.pushNamed(context, AppRoutes.addService),
+                  )
+                : _ServiceTimeline(
+                    services: services,
+                    hPad: hPad,
+                    contentWidth: contentWidth,
+                    onEdit: _onEditService,
+                    onDelete: _onDeleteService,
+                  ),
+          ),
+          _HistoryBottomNav(
+            selectedIndex: _selectedNav,
+            onTap: (i) {
+              if (i == 0)
+                Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+              if (i == 2) Navigator.pushNamed(context, AppRoutes.addService);
+              if (i == 3) Navigator.pushNamed(context, AppRoutes.reminder);
+            },
+          ),
+        ],
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-Widgets (AppBar, Timeline, Card, EmptyState) Tetap Konsisten Sesuai Desain UI Claude
-// ─────────────────────────────────────────────────────────────────────────────
+// ... (_ServiceHistoryAppBar & _ServiceTimeline tetap sama)
 
 class _ServiceHistoryAppBar extends StatelessWidget {
   final double hPad;
@@ -322,167 +322,170 @@ class _ServiceCard extends StatelessWidget {
     required this.onDelete,
   });
 
+  // Helper lokal untuk menentukan ikon berdasarkan string nama komponen database MySQL
+  IconData _getComponentIcon(String name) {
+    switch (name) {
+      case 'Oli Mesin':
+        return Icons.opacity_rounded;
+      case 'Busi':
+        return Icons.electric_bolt_rounded;
+      case 'Kampas Rem':
+        return Icons.album_rounded;
+      case 'Filter Udara':
+        return Icons.air_rounded;
+      default:
+        return Icons.build_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-      key: Key(service.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        onDelete();
-        return false;
-      },
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: AppConstants.spaceMD),
-        decoration: BoxDecoration(
-          color: AppColors.dangerLight,
-          borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-        ),
-        child: const Icon(Icons.delete_rounded, color: AppColors.danger),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppConstants.spaceMD),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppConstants.radiusMD),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppConstants.spaceMD),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight.withOpacity(0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    service.componentIcon,
-                    color: AppColors.primary,
-                    size: 18,
-                  ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight.withOpacity(0.15),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(width: AppConstants.spaceSM),
-                Expanded(
-                  child: Text(
+                child: Icon(
+                  _getComponentIcon(
                     service.componentName,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
+                  ), // ◄── FIX: Sekarang panggil componentName
+                  color: AppColors.primary,
+                  size: 18,
                 ),
-                PopupMenuButton<String>(
-                  onSelected: (val) {
-                    if (val == 'edit') onEdit();
-                    if (val == 'delete') onDelete();
-                  },
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-                  ),
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.edit_outlined,
-                            size: 18,
-                            color: AppColors.primary,
-                          ),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.delete_outlined,
-                            size: 18,
-                            color: AppColors.danger,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Hapus',
-                            style: TextStyle(color: AppColors.danger),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  child: const Icon(
-                    Icons.more_vert_rounded,
-                    color: AppColors.textSecondary,
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppConstants.spaceXS),
-            Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  size: 13,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  DateFormat('d MMM yyyy', 'id_ID').format(service.serviceDate),
+              ),
+              const SizedBox(width: AppConstants.spaceSM),
+              Expanded(
+                child: Text(
+                  service
+                      .componentName, // ◄── FIX: Sekarang panggil componentName
                   style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(width: AppConstants.spaceMD),
-                const Icon(
-                  Icons.speed_rounded,
-                  size: 13,
-                  color: AppColors.textSecondary,
+              ),
+              PopupMenuButton<String>(
+                onSelected: (val) {
+                  if (val == 'edit') onEdit();
+                  if (val == 'delete') onDelete();
+                },
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppConstants.radiusMD),
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  '${service.serviceKm.toString().replaceAllMapped(RegExp(r"(\d)(?=(\d{3})+$)"), (m) => "${m[1]}.")} KM',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
+                        SizedBox(width: 8),
+                        Text('Edit'),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            if (service.notes != null && service.notes!.isNotEmpty) ...[
-              const SizedBox(height: AppConstants.spaceXS),
-              Text(
-                service.notes!,
-                style: const TextStyle(
-                  fontSize: 13,
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_outlined,
+                          size: 18,
+                          color: AppColors.danger,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Hapus',
+                          style: TextStyle(color: AppColors.danger),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                child: const Icon(
+                  Icons.more_vert_rounded,
                   color: AppColors.textSecondary,
-                  height: 1.4,
+                  size: 20,
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: AppConstants.spaceXS),
+          Row(
+            children: [
+              const Icon(
+                Icons.calendar_today_outlined,
+                size: 13,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                DateFormat('d MMM yyyy', 'id_ID').format(service.serviceDate),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: AppConstants.spaceMD),
+              const Icon(
+                Icons.speed_rounded,
+                size: 13,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '${service.serviceKm.toString().replaceAllMapped(RegExp(r"(\d)(?=(\d{3})+$)"), (m) => "${m[1]}.")} KM',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          if (service.notes != null && service.notes!.isNotEmpty) ...[
+            const SizedBox(height: AppConstants.spaceXS),
+            Text(
+              service.notes!,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 }
 
+// ... (_EmptyServiceState & _HistoryBottomNav tetap dipertahankan penuh)
 class _EmptyServiceState extends StatelessWidget {
   final VoidCallback onAddService;
   const _EmptyServiceState({required this.onAddService});

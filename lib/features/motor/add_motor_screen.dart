@@ -1,11 +1,19 @@
 // lib/features/motor/add_motor_screen.dart
+// ─────────────────────────────────────────────────────────────────────────────
+// Add Motor Screen — MotoLog (Sinkronisasi Onboarding Ke Provider & REST API)
+// ─────────────────────────────────────────────────────────────────────────────
 
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart'; // ◄── FIX: Wajib ditambahkan untuk memanggil context.read
+import 'package:motolog/core/services/auth_services.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/state/app_state.dart';
 import '../../core/utils/app_navigator.dart';
-import '../../models/motor_model.dart';
+import '../../core/constants/app_config.dart';
+import '../../core/state/app_state.dart'; // ◄── FIX: Impor AppState pusat
 
 // Import sub-widgets terpisah
 import 'widgets/add_motor_app_bar.dart';
@@ -30,7 +38,6 @@ class _AddMotorScreenState extends State<AddMotorScreen> {
   String? _selectedBrand;
   bool _isLoading = false;
 
-  // State penampung data kilometer servis awal untuk komponen utama
   final Map<String, int> _componentLastServices = {
     'Oli Mesin': 0,
     'Busi': 0,
@@ -49,8 +56,7 @@ class _AddMotorScreenState extends State<AddMotorScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    final currentUser = AppState.instance.user;
-
+    final currentUser = AuthService.instance.currentUser;
     if (currentUser == null) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -63,33 +69,75 @@ class _AddMotorScreenState extends State<AddMotorScreen> {
     final int baseCurrentKm =
         int.tryParse(_kmCtrl.text.replaceAll('.', '').trim()) ?? 0;
 
-    // Normalisasi: Jika user tidak mengisi/mencentang riwayat servis komponen,
-    // maka kita samakan nilainya dengan currentKm motor saat ini (dianggap masih baru/aman).
-    final Map<String, int> finalizedComponentServices = {};
+    // ◄── FIX MUTLAK: Proses pengisian map komponen tanpa eror typo compiler ──►
+    final Map<String, int> finalizedComponents = {};
     _componentLastServices.forEach((key, value) {
-      finalizedComponentServices[key] = value > 0 ? value : baseCurrentKm;
+      finalizedComponents[key] = value > 0 ? value : baseCurrentKm;
     });
 
-    final motor = MotorModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      userId: currentUser.id,
-      name: _nameCtrl.text.trim(),
-      brand: _selectedBrand ?? '',
-      currentKm: baseCurrentKm,
-      createdAt: DateTime.now(),
-      componentLastServices:
-          finalizedComponentServices, // Data riwayat terikat sempurna ke model!
-    );
+    try {
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.baseUrl}/api/motorcycles'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'user_id': currentUser.id,
+              'name': _nameCtrl.text.trim(),
+              'brand': _selectedBrand ?? '',
+              'current_km': baseCurrentKm,
+              'components': finalizedComponents,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
-    await AppState.instance.addMotor(motor);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // ◄── KUNCI EMAS AMAN: Tarik data dari MySQL ke AppState sebelum widget Dashboard di-build ──►
+        await context.read<AppState>().fetchActiveMotor(currentUser.id);
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+        if (!mounted) return;
+        setState(() => _isLoading = false);
 
-    if (widget.isOnboarding) {
-      AppNavigator.goToDashboard(context);
-    } else {
-      Navigator.pop(context, motor);
+        if (widget.isOnboarding) {
+          AppNavigator.goToDashboard(context);
+        } else {
+          Navigator.pop(
+            context,
+            true,
+          ); // Kirim return true sebagai indikator sukses
+        }
+      } else {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+
+        final body = json.decode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(body['message'] ?? 'Gagal menyimpan motor.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } on TimeoutException {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Koneksi lambat. Periksa jaringan kamu.'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Terjadi kesalahan. Coba lagi.'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -119,8 +167,6 @@ class _AddMotorScreenState extends State<AddMotorScreen> {
                   children: [
                     AddMotorHeroCard(contentWidth: contentWidth),
                     const SizedBox(height: AppConstants.spaceLG),
-
-                    // Kumpulan input form utama dan form komponen kustom
                     AddMotorFields(
                       nameController: _nameCtrl,
                       kmController: _kmCtrl,

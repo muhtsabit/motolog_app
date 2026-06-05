@@ -1,13 +1,10 @@
-// lib/core/services/auth_service.dart
-//
-// Mock Auth Service — MotoLog
-// Simulasi login, register, Google sign-in, forgot password.
-// Ganti implementasi ini dengan Firebase/Supabase/REST API nanti.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import 'dart:async';
-
-// ── Model ────────────────────────────────────────────────────────────────────
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
+import '../constants/app_config.dart';
 
 class UserModel {
   final String id;
@@ -22,6 +19,15 @@ class UserModel {
     this.photoUrl,
   });
 
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'].toString(),
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      photoUrl: json['photo_url'],
+    );
+  }
+
   UserModel copyWith({String? name, String? email, String? photoUrl}) {
     return UserModel(
       id: id,
@@ -32,181 +38,255 @@ class UserModel {
   }
 }
 
-// ── Result wrapper ────────────────────────────────────────────────────────────
-
 class AuthResult<T> {
   final T? data;
   final String? error;
-  bool get isSuccess => error == null;
+  bool get isSuccess => data != null;
 
   const AuthResult.success(this.data) : error = null;
+  const AuthResult.cancelled() : data = null, error = null;
   const AuthResult.failure(this.error) : data = null;
 }
 
-// ── Mock database ─────────────────────────────────────────────────────────────
+class AuthService extends ChangeNotifier {
+  AuthService._() {
+    _auth.authStateChanges().listen((User? firebaseUser) {
+      if (firebaseUser == null) {
+        _currentUser = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+      }
+    });
+  }
 
-// Simulasi "database" pengguna terdaftar
-final _mockUsers = <String, _MockUserRecord>{};
-
-class _MockUserRecord {
-  final UserModel user;
-  final String password;
-  _MockUserRecord({required this.user, required this.password});
-}
-
-// ── Auth Service ──────────────────────────────────────────────────────────────
-
-class AuthService {
-  // Singleton
-  AuthService._();
   static final AuthService instance = AuthService._();
 
   UserModel? _currentUser;
   UserModel? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
 
-  // Stream untuk listen perubahan auth state
-  final _authStateController = StreamController<UserModel?>.broadcast();
-  Stream<UserModel?> get authStateStream => _authStateController.stream;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
-  // ── Login ──────────────────────────────────────────────────
-  Future<AuthResult<UserModel>> login({
-    required String email,
-    required String password,
-  }) async {
-    await _simulateDelay();
+  // Cek motor
+  Future<bool> hasMotorcycles(String userId) async {
+    try {
+      debugPrint("=== MOLOG: Cek motor userId=$userId ===");
+      final response = await http
+          .get(Uri.parse('${AppConfig.baseUrl}/api/motorcycles/$userId'))
+          .timeout(const Duration(seconds: 5));
 
-    final record = _mockUsers[email.toLowerCase()];
-
-    if (record == null) {
-      return const AuthResult.failure('Email tidak terdaftar.');
+      if (response.statusCode == 200) {
+        final List<dynamic> list = json.decode(response.body);
+        debugPrint("=== MOLOG: Jumlah motor = ${list.length} ===");
+        return list.isNotEmpty;
+      }
+      return false;
+    } catch (e) {
+      debugPrint("=== MOLOG: Gagal cek motor ($e), fallback true ===");
+      return true;
     }
-    if (record.password != password) {
-      return const AuthResult.failure('Kata sandi salah.');
-    }
-
-    _currentUser = record.user;
-    _authStateController.add(_currentUser);
-    return AuthResult.success(_currentUser);
   }
 
-  // ── Register ───────────────────────────────────────────────
-  Future<AuthResult<UserModel>> register({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
-    await _simulateDelay();
+  // Login Manual
+  Future<AuthResult<UserModel>> loginManual(
+    String email,
+    String password,
+  ) async {
+    try {
+      debugPrint("=== MOLOG: Login manual $email ===");
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.baseUrl}/api/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({'email': email.trim(), 'password': password}),
+          )
+          .timeout(const Duration(seconds: 10));
 
-    final key = email.toLowerCase();
+      debugPrint("=== MOLOG: Login HTTP ${response.statusCode} ===");
 
-    if (_mockUsers.containsKey(key)) {
-      return const AuthResult.failure('Email sudah terdaftar.');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _currentUser = UserModel.fromJson(data['user']);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+        return AuthResult.success(_currentUser);
+      } else {
+        final data = json.decode(response.body);
+        return AuthResult.failure(
+          data['message'] ?? 'Email atau kata sandi salah.',
+        );
+      }
+    } on TimeoutException {
+      return const AuthResult.failure('Koneksi lambat. Periksa jaringan kamu.');
+    } catch (e) {
+      debugPrint("=== MOLOG: Error loginManual — $e ===");
+      return const AuthResult.failure('Terjadi kesalahan. Coba lagi.');
     }
-
-    final newUser = UserModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name.trim(),
-      email: email.toLowerCase(),
-    );
-
-    _mockUsers[key] = _MockUserRecord(user: newUser, password: password);
-
-    _currentUser = newUser;
-    _authStateController.add(_currentUser);
-    return AuthResult.success(_currentUser);
   }
 
-  // ── Google Sign-In (mock) ──────────────────────────────────
+  // Register
+  Future<AuthResult<UserModel>> register(
+    String name,
+    String email,
+    String password,
+  ) async {
+    try {
+      debugPrint("=== MOLOG: Register $email ===");
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.baseUrl}/api/register'),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'name': name.trim(),
+              'email': email.trim(),
+              'password': password,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      debugPrint("=== MOLOG: Register HTTP ${response.statusCode} ===");
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _currentUser = UserModel.fromJson(data['user']);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+        return AuthResult.success(_currentUser);
+      } else {
+        final data = json.decode(response.body);
+        // Laravel validation error
+        if (data['errors'] != null) {
+          final errors = data['errors'] as Map<String, dynamic>;
+          final firstMsg = (errors.values.first as List).first.toString();
+          return AuthResult.failure(firstMsg);
+        }
+        return AuthResult.failure(
+          data['message'] ?? 'Gagal mendaftar. Coba lagi.',
+        );
+      }
+    } on TimeoutException {
+      return const AuthResult.failure('Koneksi lambat. Periksa jaringan kamu.');
+    } catch (e) {
+      debugPrint("=== MOLOG: Error register — $e ===");
+      return const AuthResult.failure('Terjadi kesalahan. Coba lagi.');
+    }
+  }
+
+  // Google Sign-In
   Future<AuthResult<UserModel>> signInWithGoogle() async {
-    await _simulateDelay(ms: 1200);
+    try {
+      debugPrint("=== MOLOG: Memulai Google Sign-In v7 ===");
 
-    // Mock: selalu berhasil dengan user dummy Google
-    const mockGoogleUser = UserModel(
-      id: 'google_mock_001',
-      name: 'Pengguna Google',
-      email: 'pengguna@gmail.com',
-      photoUrl: null, // nanti isi dengan URL foto Google
-    );
+      final GoogleSignInAccount? googleUser = await _googleSignIn
+          .authenticate();
 
-    _mockUsers[mockGoogleUser.email] = _MockUserRecord(
-      user: mockGoogleUser,
-      password: '', // Google user tidak punya password
-    );
+      if (googleUser == null) {
+        debugPrint("=== MOLOG: Login dibatalkan pengguna ===");
+        return const AuthResult.cancelled();
+      }
 
-    _currentUser = mockGoogleUser;
-    _authStateController.add(_currentUser);
-    return AuthResult.success(_currentUser);
+      debugPrint("=== MOLOG: Akun terpilih = ${googleUser.email} ===");
+
+      final String? idToken = googleUser.authentication.idToken;
+      if (idToken == null) {
+        return const AuthResult.failure('Autentikasi gagal. Coba lagi.');
+      }
+
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        idToken: idToken,
+      );
+      await _auth.signInWithCredential(credential);
+      debugPrint("=== MOLOG: Firebase Auth berhasil ===");
+
+      final response = await http
+          .post(
+            Uri.parse('${AppConfig.baseUrl}/api/login-google'),
+            body: {'id_token': idToken},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      debugPrint("=== MOLOG: HTTP ${response.statusCode} ===");
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        _currentUser = UserModel.fromJson(responseData['user']);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifyListeners();
+        });
+        return AuthResult.success(_currentUser);
+      } else {
+        return const AuthResult.failure(
+          'Login gagal. Coba beberapa saat lagi.',
+        );
+      }
+    } on TimeoutException {
+      return const AuthResult.failure('Koneksi lambat. Periksa jaringan kamu.');
+    } catch (e) {
+      debugPrint("=== MOLOG: Error — $e ===");
+      return const AuthResult.failure('Terjadi kesalahan. Coba lagi.');
+    }
   }
 
-  // ── Forgot Password ────────────────────────────────────────
+  // Forgot Password
   Future<AuthResult<void>> forgotPassword({required String email}) async {
-    await _simulateDelay(ms: 1500);
-
-    final key = email.toLowerCase();
-
-    if (!_mockUsers.containsKey(key)) {
-      return const AuthResult.failure('Email tidak terdaftar.');
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+      return const AuthResult.success(null);
+    } on FirebaseAuthException catch (e) {
+      String msg;
+      switch (e.code) {
+        case 'user-not-found':
+          msg = 'Email tidak terdaftar.';
+          break;
+        case 'invalid-email':
+          msg = 'Format email tidak valid.';
+          break;
+        default:
+          msg = 'Gagal mengirim email. Coba lagi.';
+      }
+      return AuthResult.failure(msg);
+    } catch (e) {
+      return const AuthResult.failure('Koneksi bermasalah. Coba lagi.');
     }
-
-    // Mock: simulasi kirim email reset
-    // TODO: ganti dengan Firebase sendPasswordResetEmail / Supabase resetPasswordForEmail
-    return const AuthResult.success(null);
   }
 
-  // ── Reset Password ─────────────────────────────────────────
-  Future<AuthResult<void>> resetPassword({
-    required String email,
-    required String newPassword,
-  }) async {
-    await _simulateDelay();
-
-    final key = email.toLowerCase();
-    final record = _mockUsers[key];
-
-    if (record == null) {
-      return const AuthResult.failure('Email tidak ditemukan.');
-    }
-
-    _mockUsers[key] = _MockUserRecord(user: record.user, password: newPassword);
-
-    return const AuthResult.success(null);
-  }
-
-  // ── Logout ─────────────────────────────────────────────────
+  // Logout
   Future<void> logout() async {
-    await _simulateDelay(ms: 300);
-    _currentUser = null;
-    _authStateController.add(null);
-  }
+    try {
+      // 1. Kirim request POST ke Laravel untuk menghapus session di server laptop
+      await http
+          .post(
+            Uri.parse('${AppConfig.baseUrl}/api/logout'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(
+            const Duration(seconds: 3),
+          ); // Timeout singkat agar jika server mati, proses lokal tidak menggantung
 
-  // ── Update Profile ─────────────────────────────────────────
-  Future<AuthResult<UserModel>> updateProfile({
-    required String name,
-    String? photoUrl,
-  }) async {
-    await _simulateDelay();
-
-    if (_currentUser == null) {
-      return const AuthResult.failure('Tidak ada user yang login.');
+      debugPrint("=== MOLOG: Sesi server Laravel berhasil dihapus ===");
+    } catch (e) {
+      // Jika hotspot/server laptop mati saat demo, proses log out lokal tetap berjalan tanpa crash
+      debugPrint(
+        "=== MOLOG: Server Laravel offline/RTO saat logout, lanjut bersihkan lokal ===",
+      );
     }
 
-    _currentUser = _currentUser!.copyWith(name: name, photoUrl: photoUrl);
-    _mockUsers[_currentUser!.email] = _MockUserRecord(
-      user: _currentUser!,
-      password: _mockUsers[_currentUser!.email]?.password ?? '',
-    );
+    try {
+      // 2. Bersihkan sisa token token lokal (Firebase, Google, & State)
+      await _googleSignIn.signOut();
+      await _auth.signOut();
+      _currentUser = null;
 
-    _authStateController.add(_currentUser);
-    return AuthResult.success(_currentUser);
-  }
-
-  // ── Helper ─────────────────────────────────────────────────
-  Future<void> _simulateDelay({int ms = 800}) async {
-    await Future.delayed(Duration(milliseconds: ms));
-  }
-
-  void dispose() {
-    _authStateController.close();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+      debugPrint("=== MOLOG: Logout lokal berhasil murni ===");
+    } catch (e) {
+      debugPrint("=== MOLOG: Error logout lokal — $e ===");
+    }
   }
 }

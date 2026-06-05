@@ -9,9 +9,6 @@ class MotorModel {
   final String? plateNumber;
   final String? color;
   final DateTime createdAt;
-
-  /// Menyimpan data kondisi awal komponen dari onboarding
-  /// Contoh: {'Oli Mesin': 14000, 'Busi': 12000}
   final Map<String, int> componentLastServices;
 
   const MotorModel({
@@ -23,7 +20,7 @@ class MotorModel {
     this.plateNumber,
     this.color,
     required this.createdAt,
-    required this.componentLastServices, // Tambahan properti wajib
+    required this.componentLastServices,
   });
 
   MotorModel copyWith({
@@ -33,7 +30,7 @@ class MotorModel {
     int? currentKm,
     String? plateNumber,
     String? color,
-    Map<String, int>? componentLastServices, // Tambahan parameter copyWith
+    Map<String, int>? componentLastServices,
   }) {
     return MotorModel(
       id: id,
@@ -45,36 +42,50 @@ class MotorModel {
       color: color ?? this.color,
       createdAt: createdAt,
       componentLastServices:
-          componentLastServices ??
-          this.componentLastServices, // Sesuai perubahan
+          componentLastServices ?? this.componentLastServices,
     );
   }
 
   Map<String, dynamic> toMap() => {
     'id': id,
-    'userId': userId,
+    'user_id': userId,
     'name': name,
     'brand': brand,
-    'currentKm': currentKm,
-    'plateNumber': plateNumber,
+    'current_km': currentKm,
+    'plate_number': plateNumber,
     'color': color,
-    'createdAt': createdAt.toIso8601String(),
-    'componentLastServices':
-        componentLastServices, // Siap dikirim ke Backend/JSON
+    'created_at': createdAt.toIso8601String(),
+    'component_last_services': componentLastServices,
   };
 
-  factory MotorModel.fromMap(Map<String, dynamic> map) => MotorModel(
-    id: map['id'],
-    userId: map['userId'],
-    name: map['name'],
-    brand: map['brand'],
-    currentKm: map['currentKm'],
-    plateNumber: map['plateNumber'],
-    color: map['color'],
-    createdAt: DateTime.parse(map['createdAt']),
-    // Konversi data dynamic map ke Map<String, int> secara aman
-    componentLastServices: Map<String, int>.from(
-      map['componentLastServices'] ?? {},
-    ),
-  );
+  factory MotorModel.fromMap(Map<String, dynamic> map) {
+    // ◄── FIX: Amankan pembacaan key dinamis maps komponen agar support snake_case Laravel ──►
+    final rawComponents =
+        map['component_last_services'] ?? map['componentLastServices'] ?? {};
+    final Map<String, int> normalizedComponents = {};
+
+    if (rawComponents is Map) {
+      rawComponents.forEach((key, value) {
+        normalizedComponents[key.toString()] = value is int
+            ? value
+            : (int.tryParse(value.toString()) ?? 0);
+      });
+    }
+
+    return MotorModel(
+      id: map['id'].toString(),
+      userId: (map['user_id'] ?? map['userId'] ?? '').toString(),
+      name: map['name'] ?? '',
+      brand: map['brand'] ?? '',
+      currentKm: map['current_km'] ?? map['currentKm'] ?? 0,
+      plateNumber: map['plate_number'] ?? map['plateNumber'],
+      color: map['color'],
+      createdAt: map['created_at'] != null
+          ? DateTime.parse(map['created_at'])
+          : (map['createdAt'] != null
+                ? DateTime.parse(map['createdAt'])
+                : DateTime.now()),
+      componentLastServices: normalizedComponents,
+    );
+  }
 }

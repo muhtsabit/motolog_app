@@ -1,12 +1,34 @@
 // lib/features/notification/notification_screen.dart
+// ─────────────────────────────────────────────────────────────────────────────
+// Notification Screen — MotoLog (Local Fallback Version untuk Keperluan Testing)
+// ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/state/app_state.dart';
-import '../../models/notification_model.dart';
-import '../dashboard/widgets/dashboard_bottom_nav.dart'; // Re-use botnav lama
+import '../dashboard/widgets/dashboard_bottom_nav.dart';
+
+// Model Tiruan Lokal khusus pencegahan error compile sebelum modul FCM dipasang
+class LocalNotifModel {
+  final String id;
+  final String title;
+  final String message;
+  final DateTime dateTime;
+  final IconData icon;
+  final Color color;
+  bool isRead;
+
+  LocalNotifModel({
+    required this.id,
+    required this.title,
+    required this.message,
+    required this.dateTime,
+    required this.icon,
+    required this.color,
+    this.isRead = false,
+  });
+}
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -18,57 +40,83 @@ class NotificationScreen extends StatefulWidget {
 class _NotificationScreenState extends State<NotificationScreen> {
   final int _selectedNav = 3; // Tab Notifikasi Aktif
 
+  // List data dummy lokal biar halaman ga kosong pas di-demo / di-test
+  final List<LocalNotifModel> _localNotifications = [
+    LocalNotifModel(
+      id: '1',
+      title: 'Waktunya Ganti Oli! 🛠️',
+      message: 'Oli Mesin Anda sudah melewati batas pemakaian berkala.',
+      dateTime: DateTime.now().subtract(const Duration(hours: 2)),
+      icon: Icons.opacity_rounded,
+      color: Colors.amber,
+    ),
+    LocalNotifModel(
+      id: '2',
+      title: 'Kondisi Busi Prima 👍',
+      message: 'Catatan servis busi Anda berhasil diperbarui di database.',
+      dateTime: DateTime.now().subtract(const Duration(days: 1)),
+      icon: Icons.electric_bolt_rounded,
+      color: Colors.green,
+      isRead: true,
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final contentWidth = screenWidth > 520 ? 480.0 : screenWidth - 32.0;
     final hPad = (screenWidth - contentWidth) / 2;
 
+    // Hitung jumlah yang belum dibaca secara internal
+    final hasUnread = _localNotifications.any((n) => !n.isRead);
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: ListenableBuilder(
-        listenable: AppState.instance,
-        builder: (context, _) {
-          final notifList = AppState.instance.notifications;
+      body: Column(
+        children: [
+          // ── AppBar Gradient ───────────────────────────
+          _NotificationAppBar(
+            hPad: hPad,
+            hasUnread: hasUnread,
+            onReadAll: () {
+              setState(() {
+                for (var n in _localNotifications) {
+                  n.isRead = true;
+                }
+              });
+            },
+          ),
 
-          return Column(
-            children: [
-              // ── AppBar Gradient ───────────────────────────
-              _NotificationAppBar(
-                hPad: hPad,
-                hasUnread: AppState.instance.unreadNotificationCount > 0,
-                onReadAll: () => AppState.instance.markAllNotificationsAsRead(),
-              ),
-
-              // ── Main Content ──────────────────────────────
-              Expanded(
-                child: notifList.isEmpty
-                    ? const _EmptyNotificationState()
-                    : ListView.builder(
-                        padding: EdgeInsets.fromLTRB(
-                          hPad,
-                          AppConstants.spaceMD,
-                          hPad,
-                          MediaQuery.paddingOf(context).bottom +
-                              AppConstants.spaceLG,
-                        ),
-                        itemCount: notifList.length,
-                        itemBuilder: (context, i) {
-                          final notif = notifList[i];
-                          return _NotificationCard(
-                            notification: notif,
-                            onTap: () => AppState.instance
-                                .markNotificationAsRead(notif.id),
-                          );
+          // ── Main Content ──────────────────────────────
+          Expanded(
+            child: _localNotifications.isEmpty
+                ? const _EmptyNotificationState()
+                : ListView.builder(
+                    padding: EdgeInsets.fromLTRB(
+                      hPad,
+                      AppConstants.spaceMD,
+                      hPad,
+                      MediaQuery.paddingOf(context).bottom +
+                          AppConstants.spaceLG,
+                    ),
+                    itemCount: _localNotifications.length,
+                    itemBuilder: (context, i) {
+                      final notif = _localNotifications[i];
+                      return _NotificationCard(
+                        notification: notif,
+                        onTap: () {
+                          setState(() {
+                            notif.isRead = true;
+                          });
                         },
-                      ),
-              ),
+                      );
+                    },
+                  ),
+          ),
 
-              // ── Bottom Navigation Bar ─────────────────────
-              DashboardBottomNav(selectedIndex: _selectedNav),
-            ],
-          );
-        },
+          // ── Bottom Navigation Bar ─────────────────────
+          DashboardBottomNav(selectedIndex: _selectedNav),
+        ],
       ),
     );
   }
@@ -114,16 +162,14 @@ class _NotificationAppBar extends StatelessWidget {
                     color: Colors.white,
                     size: 18,
                   ),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
+                  onPressed: () => Navigator.pop(context),
                 ),
                 const SizedBox(width: 4),
-                Expanded(
+                const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
+                    children: [
                       Text(
                         'Pemberitahuan',
                         style: TextStyle(
@@ -148,7 +194,6 @@ class _NotificationAppBar extends StatelessWidget {
               ],
             ),
           ),
-
           const SizedBox(width: 8),
           if (hasUnread)
             TextButton.icon(
@@ -178,9 +223,8 @@ class _NotificationAppBar extends StatelessWidget {
   }
 }
 
-// ── SUB-WIDGET: NOTIFICATION CARD ITEM ───────────────────────────────────────
 class _NotificationCard extends StatelessWidget {
-  final NotificationModel notification;
+  final LocalNotifModel notification;
   final VoidCallback onTap;
 
   const _NotificationCard({required this.notification, required this.onTap});
@@ -194,7 +238,6 @@ class _NotificationCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: AppConstants.spaceSM),
         padding: const EdgeInsets.all(AppConstants.spaceMD),
         decoration: BoxDecoration(
-          // Jika belum dibaca, beri background biru/teal ultra tipis transparan
           color: notification.isRead
               ? Colors.white
               : const Color(0xFF2BBCD4).withOpacity(0.05),
@@ -209,7 +252,6 @@ class _NotificationCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Icon Indikator Kategori Bulat melengkung
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -223,8 +265,6 @@ class _NotificationCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppConstants.spaceMD),
-
-            // Detail Pesan Teks
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,7 +282,6 @@ class _NotificationCard extends StatelessWidget {
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      // Dot penanda belum dibaca di pojok kanan atas judul
                       if (!notification.isRead)
                         Container(
                           width: 8,
@@ -285,7 +324,6 @@ class _NotificationCard extends StatelessWidget {
   }
 }
 
-// ── SUB-WIDGET: EMPTY STATE NOTIFIKASI ───────────────────────────────────────
 class _EmptyNotificationState extends StatelessWidget {
   const _EmptyNotificationState();
 

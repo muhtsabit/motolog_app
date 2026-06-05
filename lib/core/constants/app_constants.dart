@@ -39,4 +39,18 @@ abstract class AppConstants {
 
   // ── Splash ───────────────────────────────────────────────────
   static const Duration splashDuration = Duration(seconds: 2);
+
+  // Tambahkan baris ini di dalam class AppConstants kamu:
+  static const List<String> motorBrands = [
+    'Honda',
+    'Yamaha',
+    'Suzuki',
+    'Kawasaki',
+    'TVS',
+    'Bajaj',
+    'KTM',
+    'Royal Enfield',
+    'Vespa',
+    'Lainnya',
+  ];
 }

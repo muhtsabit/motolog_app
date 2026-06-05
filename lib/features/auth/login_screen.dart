@@ -1,5 +1,3 @@
-// lib/features/auth/login_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/app_constants.dart';
@@ -8,9 +6,9 @@ import '../../core/theme/app_colors.dart';
 import '../../shared/widgets/auth_text_field.dart';
 import '../../shared/widgets/or_divider.dart';
 import 'widgets/auth_header.dart';
-
-import '../../core/state/app_state.dart';
-import '../../core/utils/app_navigator.dart';
+import 'widgets/auth_actions.dart';
+import '../../core/services/auth_services.dart';
+import '../../core/utils/auth_redirect.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -48,8 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    // Panggil login resmi dari AppState tunggal
-    final error = await AppState.instance.login(
+    final result = await AuthService.instance.loginManual(
       _emailCtrl.text.trim(),
       _passwordCtrl.text,
     );
@@ -57,15 +54,19 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (error != null) {
-      // Tampilkan error jika email/password salah
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: AppColors.danger),
-      );
-    } else {
-      // JIKA SUKSES: Biarkan AppNavigator yang memutuskan ke AddMotor atau Dashboard
-      AppNavigator.goAfterAuth(context);
+    if (!result.isSuccess) {
+      if (result.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error!),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+      return;
     }
+
+    await AuthRedirect.navigate(context, userId: result.data!.id);
   }
 
   @override
@@ -78,14 +79,11 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // ── Header ──────────────────────────────────────
           AuthHeader(
             title: 'Selamat Datang',
             subtitle: 'Masuk ke akun MotoLog Anda',
             contentWidth: contentWidth,
           ),
-
-          // ── Form body ────────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
@@ -99,7 +97,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Email
                     AuthTextField(
                       label: 'Email',
                       hint: 'contoh@email.com',
@@ -108,16 +105,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       validator: (v) {
-                        if (v == null || v.isEmpty)
+                        if (v == null || v.isEmpty) {
                           return 'Email tidak boleh kosong';
-                        if (!v.contains('@')) return 'Format email tidak valid';
+                        }
+                        if (!v.contains('@')) {
+                          return 'Format email tidak valid';
+                        }
                         return null;
                       },
                     ),
-
                     const SizedBox(height: AppConstants.spaceMD),
-
-                    // Kata Sandi
                     AuthTextField(
                       label: 'Kata Sandi',
                       hint: 'Masukkan kata sandi',
@@ -138,23 +135,22 @@ class _LoginScreenState extends State<LoginScreen> {
                             setState(() => _obscurePass = !_obscurePass),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty)
+                        if (v == null || v.isEmpty) {
                           return 'Kata sandi tidak boleh kosong';
-                        if (v.length < 8) return 'Minimal 8 karakter';
+                        }
+                        if (v.length < 8) {
+                          return 'Minimal 8 karakter';
+                        }
                         return null;
                       },
                     ),
-
-                    // Lupa Kata Sandi
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {
-                          Navigator.pushNamed(
-                            context,
-                            AppRoutes.forgotPassword,
-                          );
-                        },
+                        onPressed: () => Navigator.pushNamed(
+                          context,
+                          AppRoutes.forgotPassword,
+                        ),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             vertical: AppConstants.spaceXS,
@@ -172,29 +168,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: AppConstants.spaceMD),
-
-                    // Tombol Masuk
-                    _AuthPrimaryButton(
+                    AuthPrimaryButton(
                       label: 'Masuk',
                       isLoading: _isLoading,
                       onPressed: _onLogin,
                     ),
-
                     const SizedBox(height: AppConstants.spaceLG),
-
                     const OrDivider(),
-
                     const SizedBox(height: AppConstants.spaceLG),
-
-                    // Google Button
-                    const _GoogleButton(),
-
+                    const AuthGoogleButton(),
                     const SizedBox(height: AppConstants.spaceLG),
-
-                    // Link Daftar
-                    _AuthBottomLink(
+                    AuthBottomLink(
                       question: 'Belum punya akun? ',
                       actionLabel: 'Daftar',
                       onTap: () =>
@@ -206,148 +191,6 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared sub-widgets (dipakai Login & Register)
-// Letakkan di lib/features/auth/widgets/ jika ingin dipisah per file
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _AuthPrimaryButton extends StatelessWidget {
-  final String label;
-  final bool isLoading;
-  final VoidCallback onPressed;
-
-  const _AuthPrimaryButton({
-    required this.label,
-    required this.isLoading,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: ElevatedButton(
-        onPressed: isLoading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-          ),
-        ),
-        child: isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-      ),
-    );
-  }
-}
-
-class _GoogleButton extends StatelessWidget {
-  const _GoogleButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50,
-      child: OutlinedButton(
-        onPressed: () {}, // TODO: Google sign-in
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.textPrimary,
-          side: const BorderSide(color: AppColors.border, width: 1.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppConstants.radiusMD),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 22,
-              height: 22,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(0xFF4285F4),
-              ),
-              child: const Icon(
-                Icons.g_mobiledata_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-            const SizedBox(width: AppConstants.spaceSM),
-            const Text(
-              'Lanjutkan dengan Google',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AuthBottomLink extends StatelessWidget {
-  final String question;
-  final String actionLabel;
-  final VoidCallback onTap;
-
-  const _AuthBottomLink({
-    required this.question,
-    required this.actionLabel,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-          children: [
-            TextSpan(text: question),
-            WidgetSpan(
-              alignment: PlaceholderAlignment.baseline,
-              baseline: TextBaseline.alphabetic,
-              child: GestureDetector(
-                onTap: onTap,
-                child: Text(
-                  actionLabel,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

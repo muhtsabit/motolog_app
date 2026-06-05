@@ -62,8 +62,14 @@ class _SplashScreenState extends State<SplashScreen>
         );
 
     _controller.forward().then((_) {
+      if (!mounted) {
+        return;
+      }
+
       Future.delayed(const Duration(milliseconds: 800), () {
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         Navigator.of(context).pushReplacementNamed(AppRoutes.onboarding);
       });
     });
@@ -95,7 +101,6 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // ── Logo ────────────────────────────────────
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (_, _) => FadeTransition(
@@ -106,10 +111,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                 ),
-
                 const SizedBox(height: AppConstants.spaceLG),
-
-                // ── Text ────────────────────────────────────
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (_, _) => FadeTransition(
