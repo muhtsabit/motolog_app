@@ -67,3 +67,8 @@ app.*.map.json
 # Linux
 **/linux/flutter/generated_plugin_registrant.*
 **/linux/flutter/generated_plugins.cmake
+
+# Firebase config (Aman dari GitHub)
+android/app/google-services.json
+**/android/app/google-services.json
+google-services.json
