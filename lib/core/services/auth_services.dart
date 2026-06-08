@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import '../constants/app_config.dart';
+import 'notification_service.dart';
 
 class UserModel {
   final String id;
@@ -109,6 +110,10 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         _currentUser = UserModel.fromJson(data['user']);
+
+        // ◄── PERUBAHAN FIX DOSEN 1: Panggil Fungsi Sinkronisasi Bawaan Objek Instance Lu ──►
+        unawaited(NotificationService.instance.syncToken(_currentUser!.id));
+
         WidgetsBinding.instance.addPostFrameCallback((_) {
           notifyListeners();
         });
@@ -152,13 +157,16 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         _currentUser = UserModel.fromJson(data['user']);
+
+        // ◄── PERUBAHAN FIX DOSEN 2: Panggil Fungsi Sinkronisasi Bawaan Objek Instance Lu ──►
+        unawaited(NotificationService.instance.syncToken(_currentUser!.id));
+
         WidgetsBinding.instance.addPostFrameCallback((_) {
           notifyListeners();
         });
         return AuthResult.success(_currentUser);
       } else {
         final data = json.decode(response.body);
-        // Laravel validation error
         if (data['errors'] != null) {
           final errors = data['errors'] as Map<String, dynamic>;
           final firstMsg = (errors.values.first as List).first.toString();
@@ -214,6 +222,10 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         _currentUser = UserModel.fromJson(responseData['user']);
+
+        // ◄── PERUBAHAN FIX DOSEN 3: Panggil Fungsi Sinkronisasi Bawaan Objek Instance Lu ──►
+        unawaited(NotificationService.instance.syncToken(_currentUser!.id));
+
         WidgetsBinding.instance.addPostFrameCallback((_) {
           notifyListeners();
         });
@@ -257,26 +269,21 @@ class AuthService extends ChangeNotifier {
   // Logout
   Future<void> logout() async {
     try {
-      // 1. Kirim request POST ke Laravel untuk menghapus session di server laptop
       await http
           .post(
             Uri.parse('${AppConfig.baseUrl}/api/logout'),
             headers: {'Content-Type': 'application/json'},
           )
-          .timeout(
-            const Duration(seconds: 3),
-          ); // Timeout singkat agar jika server mati, proses lokal tidak menggantung
+          .timeout(const Duration(seconds: 3));
 
       debugPrint("=== MOLOG: Sesi server Laravel berhasil dihapus ===");
     } catch (e) {
-      // Jika hotspot/server laptop mati saat demo, proses log out lokal tetap berjalan tanpa crash
       debugPrint(
         "=== MOLOG: Server Laravel offline/RTO saat logout, lanjut bersihkan lokal ===",
       );
     }
 
     try {
-      // 2. Bersihkan sisa token token lokal (Firebase, Google, & State)
       await _googleSignIn.signOut();
       await _auth.signOut();
       _currentUser = null;

@@ -3,7 +3,7 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")  // ← tambahkan ini
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -14,6 +14,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        
+        // ◄── FIX METADATA AAR: Mengaktifkan desugaring Java 8 untuk flutter_local_notifications ──►
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -25,7 +28,9 @@ android {
         applicationId = "com.example.motolog"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion // TULIS EKSPLISIT ANGKA 23,
+        
+        // ◄── FIX SDK: Ditulis secara eksplisit angka 23 sesuai instruksi pemicu ──►
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -44,8 +49,11 @@ flutter {
     source = "../.."
 }
 
- // Tambahkan 3 baris ini untuk kebutuhan Google Sign-In v7.x
 dependencies {
+    // ◄── FIX DEPENDENCY: Pustaka pendukung desugaring JDK dari Google ──►
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Dependensi bawaan lu untuk kebutuhan Google Sign-In v7.x
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")

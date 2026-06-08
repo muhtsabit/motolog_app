@@ -1,16 +1,16 @@
 // lib/features/notification/notification_screen.dart
-// ─────────────────────────────────────────────────────────────────────────────
-// Notification Screen — MotoLog (Local Fallback Version untuk Keperluan Testing)
-// ─────────────────────────────────────────────────────────────────────────────
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/services/auth_services.dart';
+import '../../core/constants/app_config.dart';
 import '../dashboard/widgets/dashboard_bottom_nav.dart';
 
-// Model Tiruan Lokal khusus pencegahan error compile sebelum modul FCM dipasang
-class LocalNotifModel {
+class NotificationModel {
   final String id;
   final String title;
   final String message;
@@ -19,7 +19,8 @@ class LocalNotifModel {
   final Color color;
   bool isRead;
 
-  LocalNotifModel({
+  // ◄── FIX 1: Nama konstruktor disamakan total dengan nama Class induknya ──►
+  NotificationModel({
     required this.id,
     required this.title,
     required this.message,
@@ -28,6 +29,38 @@ class LocalNotifModel {
     required this.color,
     this.isRead = false,
   });
+
+  factory NotificationModel.fromJson(Map<String, dynamic> json) {
+    // Logika penentuan icon secara reaktif berdasarkan kata kunci judul notifikasi
+    final titleText = json['title']?.toString().toLowerCase() ?? '';
+    IconData itemIcon = Icons.notifications_active_rounded;
+    Color itemColor = Colors.blue;
+
+    if (titleText.contains('oli')) {
+      itemIcon = Icons.opacity_rounded;
+      itemColor = Colors.amber;
+    } else if (titleText.contains('busi')) {
+      itemIcon = Icons.electric_bolt_rounded;
+      itemColor = Colors.green;
+    } else if (titleText.contains('rem')) {
+      // ◄── FIX 2: Karakter kanji diganti dengan icon Material resmi yang legal (Kampas/Disc Rem) ──►
+      itemIcon = Icons.album_rounded;
+      itemColor = Colors.orange;
+    }
+
+    // ◄── FIX 3: Mengembalikan cetakan objek yang sesuai dengan struktur barunya ──►
+    return NotificationModel(
+      id: json['id'].toString(),
+      title: json['title'] ?? 'Pemberitahuan MotoLog',
+      message: json['body'] ?? json['message'] ?? '',
+      dateTime: json['created_at'] != null
+          ? DateTime.parse(json['created_at']).toLocal()
+          : DateTime.now(),
+      icon: itemIcon,
+      color: itemColor,
+      isRead: json['is_read'] == 1 || json['is_read'] == true,
+    );
+  }
 }
 
 class NotificationScreen extends StatefulWidget {
@@ -38,28 +71,56 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
-  final int _selectedNav = 3; // Tab Notifikasi Aktif
+  final int _selectedNav = 3;
+  late Future<List<NotificationModel>> _fetchNotificationsFuture;
 
-  // List data dummy lokal biar halaman ga kosong pas di-demo / di-test
-  final List<LocalNotifModel> _localNotifications = [
-    LocalNotifModel(
-      id: '1',
-      title: 'Waktunya Ganti Oli! 🛠️',
-      message: 'Oli Mesin Anda sudah melewati batas pemakaian berkala.',
-      dateTime: DateTime.now().subtract(const Duration(hours: 2)),
-      icon: Icons.opacity_rounded,
-      color: Colors.amber,
-    ),
-    LocalNotifModel(
-      id: '2',
-      title: 'Kondisi Busi Prima 👍',
-      message: 'Catatan servis busi Anda berhasil diperbarui di database.',
-      dateTime: DateTime.now().subtract(const Duration(days: 1)),
-      icon: Icons.electric_bolt_rounded,
-      color: Colors.green,
-      isRead: true,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  void _loadNotifications() {
+    final userId = context.read<AuthService>().currentUser?.id ?? '';
+    _fetchNotificationsFuture = _getNotificationsFromBackend(userId);
+  }
+
+  // Mengambil log riwayat notifikasi langsung dari MySQL laptop lu
+  Future<List<NotificationModel>> _getNotificationsFromBackend(
+    String userId,
+  ) async {
+    try {
+      final response = await http
+          .get(Uri.parse('${AppConfig.baseUrl}/api/notifications/$userId'))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        return data
+            .map((jsonItem) => NotificationModel.fromJson(jsonItem))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint("=== MOLOG ERROR: Gagal muat riwayat notifikasi ($e) ===");
+      return [];
+    }
+  }
+
+  // Mengubah status belum dibaca di server
+  Future<void> _markAllAsRead() async {
+    final userId = context.read<AuthService>().currentUser?.id ?? '';
+    try {
+      await http.post(
+        Uri.parse('${AppConfig.baseUrl}/api/notifications/read-all/$userId'),
+      );
+      setState(() {
+        _loadNotifications(); // Reload data secara visual
+      });
+    } catch (e) {
+      debugPrint("=== MOLOG ERROR: Gagal tandai dibaca ($e) ===");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,31 +128,47 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final contentWidth = screenWidth > 520 ? 480.0 : screenWidth - 32.0;
     final hPad = (screenWidth - contentWidth) / 2;
 
-    // Hitung jumlah yang belum dibaca secara internal
-    final hasUnread = _localNotifications.any((n) => !n.isRead);
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // ── AppBar Gradient ───────────────────────────
-          _NotificationAppBar(
-            hPad: hPad,
-            hasUnread: hasUnread,
-            onReadAll: () {
-              setState(() {
-                for (var n in _localNotifications) {
-                  n.isRead = true;
-                }
-              });
+          // ── Future AppBar Handler ───────────────────────────
+          FutureBuilder<List<NotificationModel>>(
+            future: _fetchNotificationsFuture,
+            builder: (context, snapshot) {
+              final list = snapshot.data ?? [];
+              final hasUnread = list.any((n) => !n.isRead);
+
+              return _NotificationAppBar(
+                hPad: hPad,
+                hasUnread: hasUnread,
+                onReadAll: _markAllAsRead,
+              );
             },
           ),
 
-          // ── Main Content ──────────────────────────────
+          // ── Main Content Dinamis ──────────────────────────────
           Expanded(
-            child: _localNotifications.isEmpty
-                ? const _EmptyNotificationState()
-                : ListView.builder(
+            child: FutureBuilder<List<NotificationModel>>(
+              future: _fetchNotificationsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final notifications = snapshot.data ?? [];
+
+                if (notifications.isEmpty) {
+                  return const _EmptyNotificationState();
+                }
+
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    setState(() {
+                      _loadNotifications();
+                    });
+                  },
+                  child: ListView.builder(
                     padding: EdgeInsets.fromLTRB(
                       hPad,
                       AppConstants.spaceMD,
@@ -99,19 +176,29 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       MediaQuery.paddingOf(context).bottom +
                           AppConstants.spaceLG,
                     ),
-                    itemCount: _localNotifications.length,
+                    itemCount: notifications.length,
                     itemBuilder: (context, i) {
-                      final notif = _localNotifications[i];
+                      final notif = notifications[i];
                       return _NotificationCard(
                         notification: notif,
-                        onTap: () {
-                          setState(() {
-                            notif.isRead = true;
-                          });
+                        onTap: () async {
+                          if (!notif.isRead) {
+                            await http.post(
+                              Uri.parse(
+                                '${AppConfig.baseUrl}/api/notifications/read/${notif.id}',
+                              ),
+                            );
+                            setState(() {
+                              notif.isRead = true;
+                            });
+                          }
                         },
                       );
                     },
                   ),
+                );
+              },
+            ),
           ),
 
           // ── Bottom Navigation Bar ─────────────────────
@@ -122,6 +209,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   }
 }
 
+// Berkas widget sub-komponen AppBar & Card di bawah ini dipertahankan strukturnya agar UI tidak berubah
 class _NotificationAppBar extends StatelessWidget {
   final double hPad;
   final bool hasUnread;
@@ -224,7 +312,7 @@ class _NotificationAppBar extends StatelessWidget {
 }
 
 class _NotificationCard extends StatelessWidget {
-  final LocalNotifModel notification;
+  final NotificationModel notification;
   final VoidCallback onTap;
 
   const _NotificationCard({required this.notification, required this.onTap});
