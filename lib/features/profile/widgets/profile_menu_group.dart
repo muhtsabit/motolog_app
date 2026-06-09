@@ -1,11 +1,53 @@
-// lib/features/profile/widgets/profile_menu_group.dart
-
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 
 class ProfileMenuGroup extends StatelessWidget {
   const ProfileMenuGroup({super.key});
+
+  void _showAboutMotoLog(BuildContext context) {
+    showAboutDialog(
+      context: context,
+      applicationName: 'MotoLog',
+      applicationVersion: 'v1.0.0',
+      applicationIcon: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: const BoxDecoration(
+          color: Color(0xFF2BBCD4),
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          Icons.directions_bike_rounded,
+          color: Colors.white,
+          size: 32,
+        ),
+      ),
+      applicationLegalese: '© 2026 MotoLog.\nAll rights reserved.',
+      children: [
+        const SizedBox(height: 16),
+        const Text(
+          'MotoLog adalah aplikasi pencatatan dan monitoring perawatan komponen sepeda motor berbasis kilometer reaktif.',
+          style: TextStyle(
+            fontSize: 12,
+            height: 1.4,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const Divider(),
+        const SizedBox(height: 12),
+        const Text(
+          'Copyright © 2026 MotoLog.\nDeveloped by Muhamad Tsabit.\nPowered by Flutter and Laravel.\nAll registered trademarks belong to their respective owners.',
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey,
+            height: 1.5,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +80,7 @@ class ProfileMenuGroup extends StatelessWidget {
           _MenuTile(
             icon: Icons.info_outline_rounded,
             title: 'Tentang MotoLog',
-            onTap: () {},
+            onTap: () => _showAboutMotoLog(context),
           ),
         ],
       ),

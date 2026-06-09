@@ -9,6 +9,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/services/auth_services.dart';
 import '../../core/constants/app_config.dart';
 import '../dashboard/widgets/dashboard_bottom_nav.dart';
+import 'widgets/notification_app_bar.dart'; // ← widget eksternal
 
 class NotificationModel {
   final String id;
@@ -19,7 +20,6 @@ class NotificationModel {
   final Color color;
   bool isRead;
 
-  // ◄── FIX 1: Nama konstruktor disamakan total dengan nama Class induknya ──►
   NotificationModel({
     required this.id,
     required this.title,
@@ -31,7 +31,6 @@ class NotificationModel {
   });
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
-    // Logika penentuan icon secara reaktif berdasarkan kata kunci judul notifikasi
     final titleText = json['title']?.toString().toLowerCase() ?? '';
     IconData itemIcon = Icons.notifications_active_rounded;
     Color itemColor = Colors.blue;
@@ -43,22 +42,28 @@ class NotificationModel {
       itemIcon = Icons.electric_bolt_rounded;
       itemColor = Colors.green;
     } else if (titleText.contains('rem')) {
-      // ◄── FIX 2: Karakter kanji diganti dengan icon Material resmi yang legal (Kampas/Disc Rem) ──►
       itemIcon = Icons.album_rounded;
       itemColor = Colors.orange;
     }
 
-    // ◄── FIX 3: Mengembalikan cetakan objek yang sesuai dengan struktur barunya ──►
+    // ◄── FIX: MAPPING PROPERTI DIBAWAH INI DISESUAIKAN DENGAN DATABASE MYSQL ──►
     return NotificationModel(
       id: json['id'].toString(),
       title: json['title'] ?? 'Pemberitahuan MotoLog',
-      message: json['body'] ?? json['message'] ?? '',
+      message:
+          json['message'] ??
+          json['body'] ??
+          '', // ◄── message diutamakan dibanding body
       dateTime: json['created_at'] != null
           ? DateTime.parse(json['created_at']).toLocal()
           : DateTime.now(),
       icon: itemIcon,
       color: itemColor,
-      isRead: json['is_read'] == 1 || json['is_read'] == true,
+      // Handle tipe data boolean MySQL (bisa berupa int 1/0 atau true/false string)
+      isRead:
+          json['is_read'] == 1 ||
+          json['is_read'] == true ||
+          json['is_read'] == '1',
     );
   }
 }
@@ -85,7 +90,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     _fetchNotificationsFuture = _getNotificationsFromBackend(userId);
   }
 
-  // Mengambil log riwayat notifikasi langsung dari MySQL laptop lu
   Future<List<NotificationModel>> _getNotificationsFromBackend(
     String userId,
   ) async {
@@ -107,7 +111,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
-  // Mengubah status belum dibaca di server
   Future<void> _markAllAsRead() async {
     final userId = context.read<AuthService>().currentUser?.id ?? '';
     try {
@@ -115,7 +118,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         Uri.parse('${AppConfig.baseUrl}/api/notifications/read-all/$userId'),
       );
       setState(() {
-        _loadNotifications(); // Reload data secara visual
+        _loadNotifications();
       });
     } catch (e) {
       debugPrint("=== MOLOG ERROR: Gagal tandai dibaca ($e) ===");
@@ -132,22 +135,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // ── Future AppBar Handler ───────────────────────────
           FutureBuilder<List<NotificationModel>>(
             future: _fetchNotificationsFuture,
             builder: (context, snapshot) {
               final list = snapshot.data ?? [];
               final hasUnread = list.any((n) => !n.isRead);
 
-              return _NotificationAppBar(
+              // ← PAKAI WIDGET EKSTERNAL (bukan class private lagi)
+              return NotificationAppBar(
                 hPad: hPad,
                 hasUnread: hasUnread,
                 onReadAll: _markAllAsRead,
               );
             },
           ),
-
-          // ── Main Content Dinamis ──────────────────────────────
           Expanded(
             child: FutureBuilder<List<NotificationModel>>(
               future: _fetchNotificationsFuture,
@@ -200,111 +201,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               },
             ),
           ),
-
-          // ── Bottom Navigation Bar ─────────────────────
           DashboardBottomNav(selectedIndex: _selectedNav),
-        ],
-      ),
-    );
-  }
-}
-
-// Berkas widget sub-komponen AppBar & Card di bawah ini dipertahankan strukturnya agar UI tidak berubah
-class _NotificationAppBar extends StatelessWidget {
-  final double hPad;
-  final bool hasUnread;
-  final VoidCallback onReadAll;
-
-  const _NotificationAppBar({
-    required this.hPad,
-    required this.hasUnread,
-    required this.onReadAll,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF2BBCD4), Color(0xFF1272AE)],
-        ),
-      ),
-      padding: EdgeInsets.fromLTRB(
-        AppConstants.spaceXS,
-        MediaQuery.paddingOf(context).top + AppConstants.spaceXS,
-        16,
-        AppConstants.spaceMD,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                const SizedBox(width: 4),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Pemberitahuan',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: -0.2,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'Pantau kesehatan part motor Anda',
-                        style: TextStyle(fontSize: 11, color: Colors.white70),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (hasUnread)
-            TextButton.icon(
-              onPressed: onReadAll,
-              icon: const Icon(
-                Icons.done_all_rounded,
-                color: Colors.white,
-                size: 14,
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              label: const Text(
-                'Tandai Dibaca',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -360,14 +257,16 @@ class _NotificationCard extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        notification.title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: notification.isRead
-                              ? FontWeight.w600
-                              : FontWeight.w700,
-                          color: AppColors.textPrimary,
+                      Expanded(
+                        child: Text(
+                          notification.title,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: notification.isRead
+                                ? FontWeight.w600
+                                : FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ),
                       if (!notification.isRead)

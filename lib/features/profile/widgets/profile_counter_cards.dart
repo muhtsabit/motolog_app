@@ -11,12 +11,15 @@ class ProfileCounterCards extends StatelessWidget {
   final int totalMotors;
   final int totalServices;
   final VoidCallback onMotorsTap; // Callback interaktivitas lembaran bawah
+  final VoidCallback
+  onServicesTap; // ◄── TAMBAHAN FIX: Callback untuk navigasi ke halaman riwayat servis
 
   const ProfileCounterCards({
     super.key,
     required this.totalMotors,
     required this.totalServices,
     required this.onMotorsTap,
+    required this.onServicesTap, // ◄── WAJIB DIMINTA DI KONSTRUKTOR
   });
 
   @override
@@ -36,11 +39,14 @@ class ProfileCounterCards extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _ItemCard(
-            count: totalServices,
-            label: 'Riwayat Servis',
-            icon: Icons.history_rounded,
-            iconColor: const Color(0xFFFF6B2C),
+          child: GestureDetector(
+            onTap: onServicesTap,
+            child: _ItemCard(
+              count: totalServices,
+              label: 'Riwayat Servis',
+              icon: Icons.history_rounded,
+              iconColor: const Color(0xFFFF6B2C),
+            ),
           ),
         ),
       ],

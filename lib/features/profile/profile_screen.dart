@@ -1,9 +1,3 @@
-// lib/features/profile/profile_screen.dart
-// ─────────────────────────────────────────────────────────────────────────────
-// Profile Screen — MotoLog
-// Sinkronisasi Sesi Pengguna & Statistik Motor Berbasis Arsitektur Provider
-// ─────────────────────────────────────────────────────────────────────────────
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
@@ -11,6 +5,7 @@ import '../../core/state/app_state.dart';
 import '../../core/services/auth_services.dart';
 import '../dashboard/widgets/dashboard_bottom_nav.dart';
 import '../motor/add_motor_screen.dart';
+import '../service/service_history_screen.dart';
 
 import 'widgets/profile_app_bar.dart';
 import 'widgets/profile_counter_cards.dart';
@@ -25,15 +20,11 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final int _selectedNav =
-      -1; // Profil berada di luar indeks utama 0-3 bottom nav
-
-  // ◄── LOGIKA UTAMA: Membuka Lembaran Daftar Motor dari MySQL ──►
+  final int _selectedNav = -1;
   void _showMotorSelectionSheet(BuildContext context, AppState appState) {
     showModalBottomSheet(
       context: context,
-      isScrollControlled:
-          true, // Biar bottom sheet gak ketutup keyboard pas edit nama
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -82,6 +73,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(
                             fontWeight: isSelected
                                 ? FontWeight.bold
+                                : AppColors.textPrimary == Colors.black
+                                ? FontWeight.normal
                                 : FontWeight.normal,
                             color: AppColors.textPrimary,
                           ),
@@ -100,8 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 '${motor.name} sekarang menjadi motor utama! 🏍️',
                               ),
                               behavior: SnackBarBehavior.floating,
-                              backgroundColor:
-                                  Colors.green, // Selaras dengan tema sukses
+                              backgroundColor: Colors.green,
                               duration: const Duration(seconds: 2),
                             ),
                           );
@@ -159,8 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final contentWidth = screenWidth > 520 ? 480.0 : screenWidth - 32.0;
     final hPad = (screenWidth - contentWidth) / 2;
 
-    final authService = context
-        .watch<AuthService>(); // ◄── SEKARANG DIGUNAKAN DI BAWAH
+    final authService = context.watch<AuthService>();
     final appState = context.watch<AppState>();
 
     final userName = authService.currentUser?.name ?? 'Pengguna MotoLog';
@@ -185,6 +176,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     totalServices: totalServices,
                     onMotorsTap: () =>
                         _showMotorSelectionSheet(context, appState),
+                    onServicesTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ServiceHistoryScreen(),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
                   const Text(

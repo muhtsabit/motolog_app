@@ -1,18 +1,14 @@
 // lib/features/service/service_history_screen.dart
-// ─────────────────────────────────────────────────────────────────────────────
-// Service History Screen — MotoLog
-// Integrasi Timeline Riwayat Servis Riil Berbasis Arsitektur Provider & MySQL
-// ─────────────────────────────────────────────────────────────────────────────
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart'; // ◄── Diperlukan untuk kaidah context.watch & read
+import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/state/app_state.dart';
 import '../../models/service_model.dart';
+import 'widgets/service_history_app_bar.dart'; // ← widget eksternal
 
 class ServiceHistoryScreen extends StatefulWidget {
   const ServiceHistoryScreen({super.key});
@@ -22,7 +18,7 @@ class ServiceHistoryScreen extends StatefulWidget {
 }
 
 class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
-  final int _selectedNav = 1; // Tab Riwayat Aktif
+  final int _selectedNav = 1;
 
   @override
   void initState() {
@@ -33,8 +29,6 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
         statusBarIconBrightness: Brightness.light,
       ),
     );
-
-    // ◄── KAIDAH PROVIDER: Ambil data riwayat riil dari MySQL begitu halaman dimuat ──►
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final activeMotor = context.read<AppState>().activeMotor;
       if (activeMotor != null) {
@@ -43,8 +37,6 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
     });
   }
 
-  // Catatan: Fungsi hapus dinonaktifkan opsional karena kita fokus pada tracking maju,
-  // namun dialog tetap dipertahankan murni lokal agar tidak crash
   void _onDeleteService(String id) {
     showDialog(
       context: context,
@@ -104,7 +96,6 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
     final contentWidth = screenWidth > 520 ? 480.0 : screenWidth - 32.0;
     final hPad = (screenWidth - contentWidth) / 2;
 
-    // ◄── KAIDAH PROVIDER: Ambil data secara reaktif menggunakan watch ──►
     final appState = context.watch<AppState>();
     final services = appState.serviceHistories;
 
@@ -112,7 +103,8 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          _ServiceHistoryAppBar(hPad: hPad, contentWidth: contentWidth),
+          // ← PAKAI WIDGET EKSTERNAL (bukan class private lagi)
+          ServiceHistoryAppBar(hPad: hPad, contentWidth: contentWidth),
           Expanded(
             child: appState.isLoading
                 ? const Center(
@@ -134,72 +126,12 @@ class _ServiceHistoryScreenState extends State<ServiceHistoryScreen> {
           _HistoryBottomNav(
             selectedIndex: _selectedNav,
             onTap: (i) {
-              if (i == 0)
+              if (i == 0) {
                 Navigator.pushReplacementNamed(context, AppRoutes.dashboard);
+              }
               if (i == 2) Navigator.pushNamed(context, AppRoutes.addService);
               if (i == 3) Navigator.pushNamed(context, AppRoutes.reminder);
             },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ... (_ServiceHistoryAppBar & _ServiceTimeline tetap sama)
-
-class _ServiceHistoryAppBar extends StatelessWidget {
-  final double hPad;
-  final double contentWidth;
-  const _ServiceHistoryAppBar({required this.hPad, required this.contentWidth});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF2BBCD4), Color(0xFF1272AE)],
-        ),
-      ),
-      padding: EdgeInsets.fromLTRB(
-        AppConstants.spaceXS,
-        MediaQuery.paddingOf(context).top + AppConstants.spaceXS,
-        hPad,
-        AppConstants.spaceMD,
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Riwayat Servis',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              Text(
-                'Semua catatan perawatan motor Anda',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.white.withOpacity(0.80),
-                ),
-              ),
-            ],
           ),
         ],
       ),
@@ -322,7 +254,6 @@ class _ServiceCard extends StatelessWidget {
     required this.onDelete,
   });
 
-  // Helper lokal untuk menentukan ikon berdasarkan string nama komponen database MySQL
   IconData _getComponentIcon(String name) {
     switch (name) {
       case 'Oli Mesin':
@@ -368,9 +299,7 @@ class _ServiceCard extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _getComponentIcon(
-                    service.componentName,
-                  ), // ◄── FIX: Sekarang panggil componentName
+                  _getComponentIcon(service.componentName),
                   color: AppColors.primary,
                   size: 18,
                 ),
@@ -378,8 +307,7 @@ class _ServiceCard extends StatelessWidget {
               const SizedBox(width: AppConstants.spaceSM),
               Expanded(
                 child: Text(
-                  service
-                      .componentName, // ◄── FIX: Sekarang panggil componentName
+                  service.componentName,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -485,7 +413,6 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 
-// ... (_EmptyServiceState & _HistoryBottomNav tetap dipertahankan penuh)
 class _EmptyServiceState extends StatelessWidget {
   final VoidCallback onAddService;
   const _EmptyServiceState({required this.onAddService});
