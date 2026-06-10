@@ -1,5 +1,3 @@
-// lib/models/notification_model.dart
-
 import 'package:flutter/material.dart';
 
 enum NotificationType { critical, warning, info }
@@ -21,7 +19,6 @@ class NotificationModel {
     this.isRead = false,
   });
 
-  // Getter untuk menentukan Icon berdasarkan tipe notifikasi
   IconData get icon {
     switch (type) {
       case NotificationType.critical:
@@ -33,7 +30,6 @@ class NotificationModel {
     }
   }
 
-  // Getter untuk warna aksen
   Color get color {
     switch (type) {
       case NotificationType.critical:

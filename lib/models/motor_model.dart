@@ -1,5 +1,3 @@
-// lib/models/motor_model.dart
-
 class MotorModel {
   final String id;
   final String userId;
@@ -59,7 +57,6 @@ class MotorModel {
   };
 
   factory MotorModel.fromMap(Map<String, dynamic> map) {
-    // ◄── FIX: Amankan pembacaan key dinamis maps komponen agar support snake_case Laravel ──►
     final rawComponents =
         map['component_last_services'] ?? map['componentLastServices'] ?? {};
     final Map<String, int> normalizedComponents = {};

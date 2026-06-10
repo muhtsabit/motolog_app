@@ -1,18 +1,9 @@
-// lib/core/services/motor_service.dart
-//
-// Mock Motor Service — ganti dengan Firebase/Supabase/REST nanti.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import '../../models/motor_model.dart';
 
 class MotorService {
   MotorService._();
   static final MotorService instance = MotorService._();
-
-  // Mock in-memory storage
   final List<MotorModel> _motors = [];
-
-  // ── Merek motor populer di Indonesia ──────────────────────
   static const List<String> brands = [
     'Honda',
     'Yamaha',
@@ -25,8 +16,6 @@ class MotorService {
     'Vespa',
     'Lainnya',
   ];
-
-  // ── CRUD ──────────────────────────────────────────────────
 
   Future<List<MotorModel>> getMotors(String userId) async {
     await _delay();
@@ -59,7 +48,6 @@ class MotorService {
     }
   }
 
-  // ── Check apakah user punya motor (dipakai di auth flow) ──
   Future<bool> hasMotor(String userId) async {
     await _delay(ms: 300);
     return _motors.any((m) => m.userId == userId);

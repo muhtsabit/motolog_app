@@ -1,5 +1,3 @@
-// lib/models/service_model.dart
-
 import 'package:flutter/material.dart';
 
 class ServiceModel {
@@ -61,7 +59,6 @@ class ServiceModel {
     'created_at': createdAt.toIso8601String(),
   };
 
-  // ◄── FIX MUTLAK TUBES: Pemetaan Fleksibel membaca JSON murni MySQL Laravel ──►
   factory ServiceModel.fromMap(Map<String, dynamic> map) {
     return ServiceModel(
       id: map['id'].toString(),

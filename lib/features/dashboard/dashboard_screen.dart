@@ -1,20 +1,14 @@
-// lib/features/dashboard/dashboard_screen.dart
-// ─────────────────────────────────────────────────────────────────────────────
-// Dashboard Screen — MotoLog (Versi Integrasi Penuh REST API & Provider)
-// ─────────────────────────────────────────────────────────────────────────────
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart'; // ◄── KAIDAH PROVIDER UTAMA
+import 'package:provider/provider.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/auth_services.dart';
-import '../../core/state/app_state.dart'; // ◄── BACA DATA PUSAT DARI SINI
+import '../../core/state/app_state.dart';
 import '../../models/component_model.dart';
 
-// Sub-widgets pendukung tetap aman terjaga konsistensinya
 import 'widgets/dashboard_app_bar.dart';
 import 'widgets/kilometer_card.dart';
 import 'widgets/warning_banner.dart';
@@ -47,7 +41,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // ◄── REAKTIF AMAN: Tarik data dari Laravel MySQL laptop pas halaman pertama kali dibuka ──►
     if (_isInit) {
       final currentUser = context.read<AuthService>().currentUser;
       if (currentUser != null) {
@@ -65,7 +58,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // Generator matematika bunderan komponen menggunakan data REST API riil
   List<ComponentModel> _generateDynamicComponents(
     int currentKm,
     Map<String, int> lastServices,
@@ -112,18 +104,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final contentWidth = screenWidth > 520 ? 480.0 : screenWidth - 32.0;
     final hPad = (screenWidth - contentWidth) / 2;
 
-    // ◄── KUNCI UTAMA: Tonton perubahan state global AppState ecara realtime ──►
     final appState = context.watch<AppState>();
     final activeMotor = appState.activeMotor;
 
-    // Ekstraksi Variabel dari database MySQL riil
     final motorName = activeMotor?.name ?? 'Tidak Ada Kendaraan';
     final currentKm = activeMotor?.currentKm ?? 0;
     final lastServices = activeMotor?.componentLastServices ?? {};
 
     final components = _generateDynamicComponents(currentKm, lastServices);
 
-    // Hitung Banner Peringatan Oli
     final oli = components.first;
     final bool hasWarning = currentKm > 0 && oli.remainingKm <= 1000;
     final String warningText =
@@ -154,7 +143,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Odometer Card terikat fungsi dialog edit
                           KilometerCard(
                             currentKm: currentKm,
                             onUpdate: () => _showUpdateKmDialog(currentKm),
@@ -175,8 +163,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ),
                           const SizedBox(height: AppConstants.spaceMD),
-
-                          // Render list progress bar komponen secara reaktif mutlak
                           ...components.map(
                             (c) => Padding(
                               padding: const EdgeInsets.only(
@@ -189,7 +175,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           const SizedBox(height: AppConstants.spaceLG),
                           DashboardActionButtons(
                             onAddService: () async {
-                              // Navigasi ke form input dengan membawa callback auto-refresh
                               final refresh = await Navigator.pushNamed(
                                 context,
                                 AppRoutes.addService,
@@ -212,17 +197,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ◄── UPDATE INTERFACE POP-UP DIALOG: Full UI Feedback & Loading State ──►
   void _showUpdateKmDialog(int currentKm) {
     final ctrl = TextEditingController(text: currentKm.toString());
     final dialogFormKey = GlobalKey<FormState>();
-
-    // Variabel lokal dialog untuk mengontrol loading spinner di dalam pop-up
     bool isDialogLoading = false;
 
     showDialog(
       context: context,
-      // Mencegah dialog ditutup paksa saat proses hit ke MySQL sedang berjalan
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
@@ -243,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     controller: ctrl,
                     keyboardType: TextInputType.number,
                     autofocus: true,
-                    enabled: !isDialogLoading, // Disable input saat loading
+                    enabled: !isDialogLoading,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: InputDecoration(
                       labelText: 'KM saat ini',
@@ -289,11 +270,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     : () async {
                         if (!dialogFormKey.currentState!.validate()) return;
                         final inputKm = int.parse(ctrl.text.trim());
-
-                        // 1. Nyalakan loading spinner di tombol
                         setDialogState(() => isDialogLoading = true);
 
-                        // 2. Tembak fungsi update ke AppState Provider
+                        // Tembak fungsi update ke AppState Provider
                         try {
                           final currentActiveMotor = context
                               .read<AppState>()
@@ -305,10 +284,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             );
                           }
 
-                          // 3. Tutup dialog jika sukses
                           if (context.mounted) Navigator.pop(dialogContext);
-
-                          // 4. RESPONS UI SUKSES: Munculkan Snackbar Hijau Melayang
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -322,10 +298,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             );
                           }
                         } catch (e) {
-                          // Matikan loading jika gagal
                           setDialogState(() => isDialogLoading = false);
-
-                          // 5. RESPONS UI GAGAL: Munculkan Snackbar Merah
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(

@@ -1,5 +1,3 @@
-// lib/shared/widgets/or_divider.dart
-
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';

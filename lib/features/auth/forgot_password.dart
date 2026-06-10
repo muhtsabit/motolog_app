@@ -20,7 +20,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   bool _isLoading = false;
-  bool _emailSent = false; // toggle view: form ↔ sukses
+  bool _emailSent = false;
 
   @override
   void initState() {

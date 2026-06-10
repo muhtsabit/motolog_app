@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../constants/app_config.dart';
 import 'notification_service.dart';
@@ -27,6 +28,10 @@ class UserModel {
       email: json['email'] ?? '',
       photoUrl: json['photo_url'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'id': id, 'name': name, 'email': email, 'photo_url': photoUrl};
   }
 
   UserModel copyWith({String? name, String? email, String? photoUrl}) {
@@ -59,6 +64,7 @@ class AuthService extends ChangeNotifier {
         });
       }
     });
+    tryInitLocalSession();
   }
 
   static final AuthService instance = AuthService._();
@@ -69,6 +75,20 @@ class AuthService extends ChangeNotifier {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+
+  Future<void> tryInitLocalSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userString = prefs.getString('user_session');
+      if (userString != null) {
+        _currentUser = UserModel.fromJson(json.decode(userString));
+        notifyListeners();
+        debugPrint("=== MOLOG: Sesi ditemukan, otomatis masuk dashboard ===");
+      }
+    } catch (e) {
+      debugPrint("=== MOLOG: Gagal load sesi lokal ($e) ===");
+    }
+  }
 
   // Cek motor
   Future<bool> hasMotorcycles(String userId) async {
@@ -110,8 +130,15 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         _currentUser = UserModel.fromJson(data['user']);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'user_session',
+          json.encode(_currentUser!.toJson()),
+        );
+        if (data['token'] != null) {
+          await prefs.setString('token', data['token'].toString());
+        }
 
-        // ◄── PERUBAHAN FIX DOSEN 1: Panggil Fungsi Sinkronisasi Bawaan Objek Instance Lu ──►
         unawaited(NotificationService.instance.syncToken(_currentUser!.id));
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -158,7 +185,15 @@ class AuthService extends ChangeNotifier {
         final data = json.decode(response.body);
         _currentUser = UserModel.fromJson(data['user']);
 
-        // ◄── PERUBAHAN FIX DOSEN 2: Panggil Fungsi Sinkronisasi Bawaan Objek Instance Lu ──►
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'user_session',
+          json.encode(_currentUser!.toJson()),
+        );
+        if (data['token'] != null) {
+          await prefs.setString('token', data['token'].toString());
+        }
+
         unawaited(NotificationService.instance.syncToken(_currentUser!.id));
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -188,7 +223,6 @@ class AuthService extends ChangeNotifier {
   Future<AuthResult<UserModel>> signInWithGoogle() async {
     try {
       debugPrint("=== MOLOG: Memulai Google Sign-In v7 ===");
-
       final GoogleSignInAccount? googleUser = await _googleSignIn
           .authenticate();
 
@@ -222,8 +256,15 @@ class AuthService extends ChangeNotifier {
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         _currentUser = UserModel.fromJson(responseData['user']);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'user_session',
+          json.encode(_currentUser!.toJson()),
+        );
+        if (responseData['token'] != null) {
+          await prefs.setString('token', responseData['token'].toString());
+        }
 
-        // ◄── PERUBAHAN FIX DOSEN 3: Panggil Fungsi Sinkronisasi Bawaan Objek Instance Lu ──►
         unawaited(NotificationService.instance.syncToken(_currentUser!.id));
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -269,10 +310,16 @@ class AuthService extends ChangeNotifier {
   // Logout
   Future<void> logout() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedToken = prefs.getString('token') ?? '';
+
       await http
           .post(
             Uri.parse('${AppConfig.baseUrl}/api/logout'),
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $savedToken',
+            },
           )
           .timeout(const Duration(seconds: 3));
 
@@ -286,6 +333,10 @@ class AuthService extends ChangeNotifier {
     try {
       await _googleSignIn.signOut();
       await _auth.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_session');
+      await prefs.remove('token');
+
       _currentUser = null;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {

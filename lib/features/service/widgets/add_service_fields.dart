@@ -1,5 +1,3 @@
-// lib/features/service/widgets/add_service_fields.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/constants/app_constants.dart';

@@ -1,5 +1,3 @@
-// lib/features/motor/widgets/add_motor_save_bar.dart
-
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';

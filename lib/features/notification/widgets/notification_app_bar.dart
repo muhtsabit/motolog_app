@@ -1,4 +1,3 @@
-// lib/features/notification/widgets/notification_app_bar.dart
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_routes.dart';
@@ -45,7 +44,6 @@ class NotificationAppBar extends StatelessWidget {
                     size: 18,
                   ),
                   onPressed: () {
-                    // Gunakan pushReplacement agar tidak blank saat pop
                     if (Navigator.canPop(context)) {
                       Navigator.pop(context);
                     } else {
@@ -76,7 +74,7 @@ class NotificationAppBar extends StatelessWidget {
                       SizedBox(height: 2),
                       Text(
                         'Pantau kesehatan part motor Anda',
-                        style: TextStyle(fontSize: 11, color: Colors.white70),
+                        style: TextStyle(fontSize: 10, color: Colors.white70),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),

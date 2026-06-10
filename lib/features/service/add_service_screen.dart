@@ -1,12 +1,6 @@
-// lib/features/service/add_service_screen.dart
-// ─────────────────────────────────────────────────────────────────────────────
-// Add Service Screen — MotoLog
-// Penyelarasan Form Input Dengan REST API Laravel MySQL Berdasarkan Kaidah Provider
-// ─────────────────────────────────────────────────────────────────────────────
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart'; // ◄── WAJIB UNTUK AKSES REAKTIF PROVIDER
+import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/state/app_state.dart';
@@ -37,8 +31,6 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
   void initState() {
     super.initState();
     _dateCtrl.text = DateFormat('dd/MM/yyyy').format(_selectedDate);
-
-    // ◄── KAIDAH PROVIDER: Ambil data awal odometer motor aktif secara aman via BuildContext ──►
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final activeMotor = context.read<AppState>().activeMotor;
       if (activeMotor != null) {
@@ -54,8 +46,6 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
 
   Future<void> _onSave() async {
     if (!_formKey.currentState!.validate()) return;
-
-    // Ambil instance AppState menggunakan context read
     final appState = context.read<AppState>();
 
     if (appState.activeMotor == null) {
@@ -77,21 +67,15 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
     }
 
     setState(() => _isLoading = true);
-
-    // ◄── SINKRONISASI API: Pindahkan logika pembuatan model langsung ke parameter Provider ──►
     final int cleanKm =
         int.tryParse(_kmCtrl.text.replaceAll('.', '').trim()) ?? 0;
     final String currentMotorId = appState.activeMotor!.id;
-
-    // Panggil fungsi addService terpusat yang sudah terkoneksi ke server Laravel MySQL laptop
     final errorResult = await appState.addService(
       motorcycleId: currentMotorId,
       serviceKm: cleanKm,
       componentName: _selectedComponent!,
       notes: _notesCtrl.text.trim(),
-      serviceDate: DateFormat(
-        'yyyy-MM-dd',
-      ).format(_selectedDate), // Format baku MySQL
+      serviceDate: DateFormat('yyyy-MM-dd').format(_selectedDate),
     );
 
     if (!mounted) return;
@@ -100,13 +84,10 @@ class _AddServiceScreenState extends State<AddServiceScreen> {
     if (errorResult == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Catatan servis berhasil disimpan ke MySQL laptop! 🛠️',
-          ),
+          content: Text('Catatan servis berhasil disimpan! 🛠️'),
           backgroundColor: Colors.green,
         ),
       );
-      // Kembali ke halaman sebelumnya (Halaman Riwayat otomatis ke-refresh)
       Navigator.pop(context, true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

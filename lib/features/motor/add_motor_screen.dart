@@ -1,21 +1,15 @@
-// lib/features/motor/add_motor_screen.dart
-// ─────────────────────────────────────────────────────────────────────────────
-// Add Motor Screen — MotoLog (Sinkronisasi Onboarding Ke Provider & REST API)
-// ─────────────────────────────────────────────────────────────────────────────
-
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart'; // ◄── FIX: Wajib ditambahkan untuk memanggil context.read
+import 'package:provider/provider.dart';
 import 'package:motolog/core/services/auth_services.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_navigator.dart';
 import '../../core/constants/app_config.dart';
-import '../../core/state/app_state.dart'; // ◄── FIX: Impor AppState pusat
+import '../../core/state/app_state.dart';
 
-// Import sub-widgets terpisah
 import 'widgets/add_motor_app_bar.dart';
 import 'widgets/add_motor_hero_card.dart';
 import 'widgets/add_motor_fields.dart';
@@ -68,8 +62,6 @@ class _AddMotorScreenState extends State<AddMotorScreen> {
 
     final int baseCurrentKm =
         int.tryParse(_kmCtrl.text.replaceAll('.', '').trim()) ?? 0;
-
-    // ◄── FIX MUTLAK: Proses pengisian map komponen tanpa eror typo compiler ──►
     final Map<String, int> finalizedComponents = {};
     _componentLastServices.forEach((key, value) {
       finalizedComponents[key] = value > 0 ? value : baseCurrentKm;
@@ -91,7 +83,6 @@ class _AddMotorScreenState extends State<AddMotorScreen> {
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // ◄── KUNCI EMAS AMAN: Tarik data dari MySQL ke AppState sebelum widget Dashboard di-build ──►
         await context.read<AppState>().fetchActiveMotor(currentUser.id);
 
         if (!mounted) return;
@@ -100,10 +91,7 @@ class _AddMotorScreenState extends State<AddMotorScreen> {
         if (widget.isOnboarding) {
           AppNavigator.goToDashboard(context);
         } else {
-          Navigator.pop(
-            context,
-            true,
-          ); // Kirim return true sebagai indikator sukses
+          Navigator.pop(context, true);
         }
       } else {
         if (!mounted) return;

@@ -1,5 +1,3 @@
-// lib/features/profile/widgets/profile_app_bar.dart
-
 import 'package:flutter/material.dart';
 
 class ProfileAppBar extends StatelessWidget {

@@ -1,4 +1,3 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -30,7 +29,7 @@ void main() async {
   await Firebase.initializeApp();
   await GoogleSignIn.instance.initialize();
   await initializeDateFormatting('id_ID', null);
-  await NotificationService.instance.init(); // ← init FCM + semua tap handler
+  await NotificationService.instance.init();
   runApp(const MotoLogApp());
 }
 
@@ -51,7 +50,7 @@ class MotoLogApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         themeMode: ThemeMode.light,
-        navigatorKey: navigatorKey, // ← WAJIB: pasang global navigator key
+        navigatorKey: navigatorKey,
         initialRoute: AppRoutes.splash,
         onGenerateRoute: (settings) {
           if (settings.name == AppRoutes.addMotor) {

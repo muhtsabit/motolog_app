@@ -1,14 +1,8 @@
-// lib/features/profile/widgets/profile_logout_button.dart
-// ─────────────────────────────────────────────────────────────────────────────
-// Profile Logout Button — MotoLog
-// Integrasi Sesi Bersih, Notifikasi SnackBar Berhasil, & Reset Navigasi ke Login
-// ─────────────────────────────────────────────────────────────────────────────
-
 import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/services/auth_services.dart'; // Menggunakan AuthService riil pusat
+import '../../../core/services/auth_services.dart';
 
 class ProfileLogoutButton extends StatelessWidget {
   const ProfileLogoutButton({super.key});
@@ -42,31 +36,24 @@ class ProfileLogoutButton extends StatelessWidget {
                 height: 40,
                 child: ElevatedButton(
                   onPressed: () async {
-                    // 1. Tutup pop-up dialog box terlebih dahulu
                     Navigator.pop(context);
-
-                    // 2. Eksekusi pembersihan token sesi di Laravel Backend, Firebase, dan Google
                     await AuthService.instance.logout();
 
                     if (context.mounted) {
-                      // 3. Tampilkan SnackBar Berhasil Keluar secara melayang (floating)
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text(
-                            'Sampai Jumpa Di Perjalanan Berikutnya Sob. 👋',
+                            'Sampai Jumpa di perjalanan berikutnya Sob. 👋',
                           ),
                           backgroundColor: AppColors.primary,
                           behavior: SnackBarBehavior.floating,
                           duration: Duration(seconds: 3),
                         ),
                       );
-
-                      // 4. Bersihkan Stack Trace halaman lama dan arahkan paksa ke Login Screen
                       Navigator.pushNamedAndRemoveUntil(
                         context,
-                        AppRoutes.login, // Rute mengarah ke halaman login Anda
-                        (route) =>
-                            false, // Menghapus seluruh riwayat navigasi sebelumnya
+                        AppRoutes.login,
+                        (route) => false,
                       );
                     }
                   },

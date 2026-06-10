@@ -1,4 +1,3 @@
-// lib/features/notification/notification_screen.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -9,7 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/services/auth_services.dart';
 import '../../core/constants/app_config.dart';
 import '../dashboard/widgets/dashboard_bottom_nav.dart';
-import 'widgets/notification_app_bar.dart'; // ← widget eksternal
+import 'widgets/notification_app_bar.dart';
 
 class NotificationModel {
   final String id;
@@ -45,21 +44,15 @@ class NotificationModel {
       itemIcon = Icons.album_rounded;
       itemColor = Colors.orange;
     }
-
-    // ◄── FIX: MAPPING PROPERTI DIBAWAH INI DISESUAIKAN DENGAN DATABASE MYSQL ──►
     return NotificationModel(
       id: json['id'].toString(),
       title: json['title'] ?? 'Pemberitahuan MotoLog',
-      message:
-          json['message'] ??
-          json['body'] ??
-          '', // ◄── message diutamakan dibanding body
+      message: json['message'] ?? json['body'] ?? '',
       dateTime: json['created_at'] != null
           ? DateTime.parse(json['created_at']).toLocal()
           : DateTime.now(),
       icon: itemIcon,
       color: itemColor,
-      // Handle tipe data boolean MySQL (bisa berupa int 1/0 atau true/false string)
       isRead:
           json['is_read'] == 1 ||
           json['is_read'] == true ||
@@ -140,8 +133,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
             builder: (context, snapshot) {
               final list = snapshot.data ?? [];
               final hasUnread = list.any((n) => !n.isRead);
-
-              // ← PAKAI WIDGET EKSTERNAL (bukan class private lagi)
               return NotificationAppBar(
                 hPad: hPad,
                 hasUnread: hasUnread,

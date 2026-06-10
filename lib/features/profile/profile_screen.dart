@@ -21,7 +21,57 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final int _selectedNav = -1;
-  void _showMotorSelectionSheet(BuildContext context, AppState appState) {
+  void _showEditMotorDialog(
+    BuildContext context,
+    AppState appState,
+    String userId,
+    dynamic motor,
+  ) {
+    final textController = TextEditingController(text: motor.name);
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text(
+          'Edit Nama Motor',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        content: TextField(
+          controller: textController,
+          decoration: const InputDecoration(
+            labelText: 'Nama Motor',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (textController.text.trim().isNotEmpty) {
+                await appState.updateMotor(
+                  motor.id.toString(),
+                  textController.text.trim(),
+                  motor.brand.toString(),
+                  userId,
+                );
+                if (context.mounted) Navigator.pop(dialogCtx);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Simpan', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMotorSelectionSheet(
+    BuildContext context,
+    AppState appState,
+    String userId,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -60,7 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 4,
+                          vertical: 0,
                         ),
                         leading: Icon(
                           Icons.directions_bike_rounded,
@@ -73,15 +123,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: TextStyle(
                             fontWeight: isSelected
                                 ? FontWeight.bold
-                                : AppColors.textPrimary == Colors.black
-                                ? FontWeight.normal
                                 : FontWeight.normal,
                             color: AppColors.textPrimary,
                           ),
                         ),
                         subtitle: Text(
                           '${motor.brand} • ${motor.currentKm} km',
-                          style: const TextStyle(fontSize: 12),
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.edit_note_rounded,
+                                color: Colors.blue,
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                Navigator.pop(builderContext);
+                                _showEditMotorDialog(
+                                  context,
+                                  appState,
+                                  userId,
+                                  motor,
+                                );
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: Colors.red,
+                                size: 18,
+                              ),
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (c) => AlertDialog(
+                                    title: const Text('Hapus Motor?'),
+                                    content: Text(
+                                      'Seluruh data dan riwayat servis motor ${motor.name} akan terhapus.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(c, false),
+                                        child: const Text('Batal'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(c, true),
+                                        child: const Text(
+                                          'Hapus',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+
+                                if (confirm == true) {
+                                  await appState.deleteMotor(
+                                    motor.id.toString(),
+                                    userId,
+                                  );
+                                  if (context.mounted)
+                                    Navigator.pop(builderContext);
+                                }
+                              },
+                            ),
+                          ],
                         ),
                         onTap: () {
                           appState.changeActiveMotor(motor.id);
@@ -154,6 +264,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final authService = context.watch<AuthService>();
     final appState = context.watch<AppState>();
 
+    final userId = authService.currentUser?.id ?? '';
     final userName = authService.currentUser?.name ?? 'Pengguna MotoLog';
     final userEmail = authService.currentUser?.email ?? 'loading@motolog.com';
 
@@ -175,7 +286,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     totalMotors: totalMotors,
                     totalServices: totalServices,
                     onMotorsTap: () =>
-                        _showMotorSelectionSheet(context, appState),
+                        _showMotorSelectionSheet(context, appState, userId),
                     onServicesTap: () {
                       Navigator.push(
                         context,
